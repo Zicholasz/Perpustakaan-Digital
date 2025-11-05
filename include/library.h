@@ -33,8 +33,10 @@ extern "C" {
 #define LIB_MAX_NAME        64
 #define LIB_MAX_NOTES       256
 
-/* File default untuk penyimpanan database (bisa diubah pada runtime) */
-#define LIB_DEFAULT_DB_FILE "library_db"
+/* File default untuk penyimpanan database (bisa diubah pada runtime).
+   Use a `data/` folder by default so files are grouped and permission issues
+   are less likely when running from the project root. */
+#define LIB_DEFAULT_DB_FILE "data/library_db"
 
 /* Batas jumlah entri default (dapat diresize dinamis) */
 #define LIB_DEFAULT_CAPACITY 256
@@ -224,6 +226,13 @@ lib_status_t lib_verify_admin(const char *username, const char *password_plain, 
    ------------------------- */
 lib_status_t lib_db_export_csv(const library_db_t *db, const char *path);
 lib_status_t lib_db_import_csv(library_db_t *db, const char *path);
+
+/* Compatibility / convenience initialiser used by older main.c */
+lib_status_t lib_db_init(library_db_t *db);
+
+/* Mutable find and delete aliases (backwards compatibility) */
+book_t *lib_find_book_by_isbn_mutable(library_db_t *db, const char *isbn);
+lib_status_t lib_delete_book(library_db_t *db, const char *isbn);
 
 /* -------------------------
    Utility / debug

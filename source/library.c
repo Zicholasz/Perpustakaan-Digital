@@ -9,13 +9,50 @@
  */
 
 #define _CRT_SECURE_NO_WARNINGS
+#define _POSIX_C_SOURCE 200809L
 
+#include <string.h>
 #include "library.h"
+
+/* Our own strdup implementation */
+static char *my_strdup(const char *str) {
+    if (!str) return NULL;
+    size_t len = strlen(str) + 1;
+    char *new_str = malloc(len);
+    if (new_str) {
+        memcpy(new_str, str, len);
+    }
+    return new_str;
+}
 
 #include <errno.h>
 #include <ctype.h>
 #include <sys/stat.h>
 #include <stdarg.h>
+#if defined(_WIN32) || defined(_WIN64)
+#include <direct.h>
+#endif
+
+/* strtok_r compatibility for Windows / non-POSIX */
+#if !defined(_GNU_SOURCE) && !defined(_POSIX_VERSION)
+/* Provide a fallback implementation mapping to strtok_s on Windows or strtok otherwise */
+#ifndef HAVE_STRTOK_R
+#if defined(_WIN32) || defined(_WIN64)
+#include <string.h>
+char *strtok_r(char *s, const char *delim, char **saveptr) {
+    /* strtok_s has different signature in MSVC; map accordingly */
+#if defined(_MSC_VER)
+    return strtok_s(s, delim, saveptr);
+#else
+    /* MinGW may not provide strtok_s; fallback to strtok (not thread-safe)
+       but this project is single-threaded so it's acceptable as a fallback. */
+    (void)saveptr;
+    return strtok(s, delim);
+#endif
+}
+#endif
+#endif
+#endif
 
 /* Platform includes for compatibility */
 #if defined(_WIN32) || defined(_WIN64)
@@ -107,6 +144,30 @@ static void trim_newline(char *s) {
         s[len-1] = '\0';
         len--;
     }
+}
+
+/* Ensure the directory portion of `path` exists. Returns 0 on success or
+   if no directory part (path is just a filename), non-zero on failure. */
+static int ensure_dir_for_path(const char *path) {
+    if (!path) return -1;
+    const char *sep = strrchr(path, '/');
+    if (!sep) sep = strrchr(path, '\\');
+    if (!sep) return 0; /* no directory part */
+    size_t len = (size_t)(sep - path);
+    if (len == 0) return 0;
+    char tmp[1024];
+    if (len >= sizeof(tmp)) return -1;
+    memcpy(tmp, path, len);
+    tmp[len] = '\0';
+#if defined(_WIN32) || defined(_WIN64)
+    if (_mkdir(tmp) == 0) return 0;
+    if (errno == EEXIST) return 0;
+    return -1;
+#else
+    if (mkdir(tmp, 0755) == 0) return 0;
+    if (errno == EEXIST) return 0;
+    return -1;
+#endif
 }
 
 static void str_to_lower_inplace(char *s) {
@@ -224,8 +285,16 @@ static char *alloc_path_with_suffix(const char *base, const char *suffix) {
 
 static lib_status_t write_books_csv_to(const library_db_t *db, const char *outfile) {
     if (!db || !outfile) return LIB_ERR_INVALID_ARG;
+    /* ensure directory exists before attempting to open file */
+    if (ensure_dir_for_path(outfile) != 0) {
+        fprintf(stderr, "[lib] write_books_csv_to: cannot ensure directory for '%s'\n", outfile);
+        return LIB_ERR_IO;
+    }
     FILE *f = fopen(outfile, "w");
-    if (!f) return LIB_ERR_IO;
+    if (!f) {
+        fprintf(stderr, "[lib] write_books_csv_to: fopen('%s') failed: %s\n", outfile, strerror(errno));
+        return LIB_ERR_IO;
+    }
     if (fprintf(f, "isbn,title,author,year,total_stock,available,notes\n") < 0) { fclose(f); return LIB_ERR_IO; }
     for (size_t i = 0; i < db->books_count; ++i) {
         const book_t *b = &db->books[i];
@@ -244,8 +313,15 @@ static lib_status_t write_books_csv_to(const library_db_t *db, const char *outfi
 
 static lib_status_t write_borrowers_csv_to(const library_db_t *db, const char *outfile) {
     if (!db || !outfile) return LIB_ERR_INVALID_ARG;
+    if (ensure_dir_for_path(outfile) != 0) {
+        fprintf(stderr, "[lib] write_borrowers_csv_to: cannot ensure directory for '%s'\n", outfile);
+        return LIB_ERR_IO;
+    }
     FILE *f = fopen(outfile, "w");
-    if (!f) return LIB_ERR_IO;
+    if (!f) {
+        fprintf(stderr, "[lib] write_borrowers_csv_to: fopen('%s') failed: %s\n", outfile, strerror(errno));
+        return LIB_ERR_IO;
+    }
     if (fprintf(f, "id,nim,name,phone,email\n") < 0) { fclose(f); return LIB_ERR_IO; }
     for (size_t i = 0; i < db->borrowers_count; ++i) {
         const borrower_t *br = &db->borrowers[i];
@@ -263,8 +339,15 @@ static lib_status_t write_borrowers_csv_to(const library_db_t *db, const char *o
 
 static lib_status_t write_loans_csv_to(const library_db_t *db, const char *outfile) {
     if (!db || !outfile) return LIB_ERR_INVALID_ARG;
+    if (ensure_dir_for_path(outfile) != 0) {
+        fprintf(stderr, "[lib] write_loans_csv_to: cannot ensure directory for '%s'\n", outfile);
+        return LIB_ERR_IO;
+    }
     FILE *f = fopen(outfile, "w");
-    if (!f) return LIB_ERR_IO;
+    if (!f) {
+        fprintf(stderr, "[lib] write_loans_csv_to: fopen('%s') failed: %s\n", outfile, strerror(errno));
+        return LIB_ERR_IO;
+    }
     if (fprintf(f, "loan_id,isbn,borrower_id,date_borrow,date_due,date_returned,is_returned,is_lost,fine_paid\n") < 0) { fclose(f); return LIB_ERR_IO; }
     for (size_t i = 0; i < db->loans_count; ++i) {
         const loan_t *l = &db->loans[i];
@@ -299,7 +382,7 @@ static lib_status_t read_books_csv(library_db_t *db, const char *path) {
         trim_newline(line);
         if (!skip_header) { skip_header = true; continue; }
         if (strlen(line) == 0) continue;
-        char *s = strdup(line);
+        char *s = my_strdup(line);
         char *ctx = NULL;
         char *tok = strtok_r(s, ",", &ctx);
         if (!tok) { free(s); continue; }
@@ -332,7 +415,7 @@ static lib_status_t read_borrowers_csv(library_db_t *db, const char *path) {
         if (!skip_header) { skip_header = true; continue; }
         if (strlen(line) == 0) continue;
         int commas = 0; for (char *c = line; *c; ++c) if (*c == ',') commas++;
-        char *s = strdup(line);
+        char *s = my_strdup(line);
         char *ctx = NULL;
         borrower_t br; memset(&br,0,sizeof(br));
         if (commas >= 4) {
@@ -368,7 +451,7 @@ static lib_status_t read_loans_csv(library_db_t *db, const char *path) {
         trim_newline(line);
         if (!skip_header) { skip_header = true; continue; }
         if (strlen(line) == 0) continue;
-        char *s = strdup(line);
+        char *s = my_strdup(line);
         char *ctx = NULL;
         loan_t ln; memset(&ln,0,sizeof(ln));
         char *tok = strtok_r(s, ",", &ctx); if (!tok) { free(s); continue; } strncpy(ln.loan_id, tok, sizeof(ln.loan_id)-1);
@@ -419,8 +502,8 @@ library_db_t *lib_db_open(const char *path, lib_status_t *err) {
     db->loans = NULL; db->loans_count = db->loans_capacity = 0;
     db->fine_per_day = LIB_DEFAULT_FINE_PER_DAY;
     db->max_book_types = LIB_MAX_BOOK_TYPES;
-    if (path) db->db_file_path = strdup(path);
-    else db->db_file_path = strdup(LIB_DEFAULT_DB_FILE);
+    if (path) db->db_file_path = my_strdup(path);
+    else db->db_file_path = my_strdup(LIB_DEFAULT_DB_FILE);
     if (!db->db_file_path) { free(db); if (err) *err = LIB_ERR_MEMORY; return NULL; }
     srand((unsigned)time(NULL));
     (void) read_books_csv(db, db->db_file_path);
@@ -428,6 +511,23 @@ library_db_t *lib_db_open(const char *path, lib_status_t *err) {
     (void) read_loans_csv(db, db->db_file_path);
     if (err) *err = LIB_OK;
     return db;
+}
+
+/* In-place initializer: prepares a stack-allocated or pre-allocated library_db_t
+   to be used by code that expects an already-initialized struct. This mirrors
+   the older `lib_db_init` API used by legacy callers. */
+lib_status_t lib_db_init(library_db_t *db) {
+    if (!db) return LIB_ERR_INVALID_ARG;
+    db->books = NULL; db->books_count = db->books_capacity = 0;
+    db->borrowers = NULL; db->borrowers_count = db->borrowers_capacity = 0;
+    db->loans = NULL; db->loans_count = db->loans_capacity = 0;
+    db->fine_per_day = LIB_DEFAULT_FINE_PER_DAY;
+    db->max_book_types = LIB_MAX_BOOK_TYPES;
+    db->db_file_path = my_strdup(LIB_DEFAULT_DB_FILE);
+    if (!db->db_file_path) return LIB_ERR_MEMORY;
+    /* Ensure data directory exists for the default DB path */
+    ensure_dir_for_path(db->db_file_path);
+    return LIB_OK;
 }
 
 /* ---------- lib_db_save (atomic write for each file) ---------- */
@@ -704,9 +804,11 @@ size_t lib_find_loans_by_borrower(const library_db_t *db, const char *borrower_i
 /* ---------- Admin auth minimal (file-based) ---------- */
 
 static void simple_hash_password(const char *plain, char *out_hash, size_t out_sz) {
-    unsigned long h = 1469598103934665603UL;
-    for (const unsigned char *p = (const unsigned char *)plain; *p; ++p) h = (h ^ *p) * 1099511628211UL;
-    snprintf(out_hash, out_sz, "%08lx", (unsigned long)(h & 0xffffffffUL));
+    /* Use 64-bit accumulator and print lower 32 bits as hex to match previous behaviour. */
+    unsigned long long h = 1469598103934665603ULL;
+    for (const unsigned char *p = (const unsigned char *)plain; *p; ++p) h = (h ^ *p) * 1099511628211ULL;
+    unsigned long long low = h & 0xffffffffULL;
+    snprintf(out_hash, out_sz, "%08x", (unsigned int)low);
 }
 
 #define ADMIN_FILE_SUFFIX "_admins.csv"
@@ -722,7 +824,7 @@ lib_status_t lib_add_admin(const char *username, const char *password_plain) {
     while (getline(&line, &len, f) != -1) {
         trim_newline(line);
         if (strlen(line) == 0) continue;
-        char *tmp = strdup(line);
+        char *tmp = my_strdup(line);
         char *ctx = NULL;
         char *tok = strtok_r(tmp, ",", &ctx);
         if (tok && strcmp(tok, username) == 0) { free(tmp); free(line); fclose(f); free(admin_path); return LIB_ERR_EXISTS; }
@@ -747,7 +849,7 @@ lib_status_t lib_verify_admin(const char *username, const char *password_plain, 
     while (getline(&line, &len, f) != -1) {
         trim_newline(line);
         if (strlen(line) == 0) continue;
-        char *tmp = strdup(line);
+        char *tmp = my_strdup(line);
         char *ctx = NULL;
         char *tok = strtok_r(tmp, ",", &ctx);
         if (tok && strcmp(tok, username) == 0) {
@@ -800,9 +902,24 @@ void lib_loan_free(loan_t *l) { if (l) free(l); }
 
 lib_status_t lib_db_export_csv(const library_db_t *db, const char *path) {
     if (!db || !path) return LIB_ERR_INVALID_ARG;
-    lib_status_t st = write_books_csv_to(db, path); if (st != LIB_OK) return st;
-    st = write_borrowers_csv_to(db, path); if (st != LIB_OK) return st;
-    st = write_loans_csv_to(db, path); return st;
+    /* treat `path` as a base path (like LIB_DEFAULT_DB_FILE) and write the three suffixed files */
+    char *p_books = alloc_path_with_suffix(path, "_books.csv");
+    if (!p_books) return LIB_ERR_MEMORY;
+    lib_status_t st = write_books_csv_to(db, p_books);
+    free(p_books);
+    if (st != LIB_OK) return st;
+
+    char *p_borrowers = alloc_path_with_suffix(path, "_borrowers.csv");
+    if (!p_borrowers) return LIB_ERR_MEMORY;
+    st = write_borrowers_csv_to(db, p_borrowers);
+    free(p_borrowers);
+    if (st != LIB_OK) return st;
+
+    char *p_loans = alloc_path_with_suffix(path, "_loans.csv");
+    if (!p_loans) return LIB_ERR_MEMORY;
+    st = write_loans_csv_to(db, p_loans);
+    free(p_loans);
+    return st;
 }
 
 lib_status_t lib_db_import_csv(library_db_t *db, const char *path) {
@@ -813,4 +930,16 @@ lib_status_t lib_db_import_csv(library_db_t *db, const char *path) {
     lib_status_t st = read_books_csv(db, path); if (st != LIB_OK) return st;
     st = read_borrowers_csv(db, path); if (st != LIB_OK) return st;
     st = read_loans_csv(db, path); return st;
+}
+
+/* Compatibility wrappers for older caller expectations */
+/* Provide a mutable find and a delete alias used by admin.c */
+book_t *lib_find_book_by_isbn_mutable(library_db_t *db, const char *isbn) {
+    if (!db || !isbn) return NULL;
+    for (size_t i = 0; i < db->books_count; ++i) if (strcmp(db->books[i].isbn, isbn) == 0) return &db->books[i];
+    return NULL;
+}
+
+lib_status_t lib_delete_book(library_db_t *db, const char *isbn) {
+    return lib_remove_book(db, isbn);
 }

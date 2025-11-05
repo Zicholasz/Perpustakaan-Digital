@@ -1,0 +1,317 @@
+/* view.c - UI module for library (animated TUI)
+   This file is adapted from your prior version with:
+   - automatic demo seeding if DB empty
+   - ui_init loads DB and seeds 3 demo books if necessary
+   - internal functions are static to avoid symbol conflicts
+*/
+
+#include "view.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <math.h>
+#include <ctype.h>
+
+#ifdef _WIN32
+  #define WIN32_LEAN_AND_MEAN
+  #include <windows.h>
+  #include <conio.h>
+  #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+  #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+  #endif
+
+  static void enable_ansi_on_windows(void) {
+      HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+      if (hOut == INVALID_HANDLE_VALUE) return;
+      DWORD dwMode = 0;
+      if (!GetConsoleMode(hOut, &dwMode)) return;
+      dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+      SetConsoleMode(hOut, dwMode);
+  }
+
+#if defined(_WIN32) && !defined(_MSC_VER)
+static int localtime_s(struct tm * _Tm, const time_t * _Time) {
+    struct tm *r = localtime(_Time);
+    if (!r) return -1;
+    *_Tm = *r;
+    return 0;
+}
+#endif
+
+  #define sleep_ms(ms) Sleep(ms)
+
+#else /* POSIX fallback */
+  #include <unistd.h>
+  #include <termios.h>
+  #include <sys/select.h>
+  #include <sys/ioctl.h>
+  #include <fcntl.h>
+  #define sleep_ms(ms) usleep((ms) * 1000)
+
+  static void enable_ansi_on_windows(void) { /* no-op */ }
+#endif
+
+/* ---------------- Configuration ---------------- */
+#define DB_FILENAME "library_db.txt"
+#define HISTORY_FILENAME "history.log"
+#define TITLE_STR "SISTEM PERPUSTAKAAN UKSW"
+
+#define FRAME_MS 60
+#define TITLE_FRAMES 8
+#define PARTICLE_COUNT 60
+
+/* ---------------- Internal state (static) ---------------- */
+static book_t s_books[1024];
+static int s_book_count = 0;
+
+typedef struct {
+    char when[64];
+    char action[16];
+    char isbn[LIB_MAX_ISBN];
+    char title[LIB_MAX_TITLE];
+} hist_t;
+static hist_t s_history[4096];
+static int s_history_count = 0;
+
+/* particle for background */
+typedef struct { int y,x,spd; char ch; } particle_t;
+static particle_t s_particles[PARTICLE_COUNT];
+
+static int s_cols = 80, s_lines = 24;
+static int s_running = 0;
+
+/* ------------------ Cross-platform helpers ------------------ */
+static void clearscreen(void) { printf("\x1b[2J\x1b[H"); }
+static void move_cursor(int r, int c) { printf("\x1b[%d;%dH", r+1, c+1); }
+static void hide_cursor(void) { printf("\x1b[?25l"); fflush(stdout); }
+static void show_cursor(void) { printf("\x1b[?25h"); fflush(stdout); }
+static void set_color(const char *ansi) { printf("%s", ansi); }
+static void reset_color(void) { printf("\x1b[0m"); fflush(stdout); }
+
+static void query_terminal_size(void) {
+#ifdef _WIN32
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (h && GetConsoleScreenBufferInfo(h, &csbi)) {
+        s_cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+        s_lines = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+    }
+#else
+    struct winsize w;
+    if (ioctl(0, TIOCGWINSZ, &w) == 0) {
+        s_cols = w.ws_col; s_lines = w.ws_row;
+    }
+#endif
+    if (s_cols < 40) s_cols = 40;
+    if (s_lines < 12) s_lines = 12;
+}
+
+/* Non-blocking single char read: returns -1 if none */
+static int nb_getch(void) {
+#ifdef _WIN32
+    if (_kbhit()) {
+        int c = _getch();
+        return c;
+    }
+    return -1;
+#else
+    struct timeval tv = {0, 0};
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(0, &fds);
+    if (select(1, &fds, NULL, NULL, &tv) > 0) {
+        char ch;
+        if (read(0, &ch, 1) == 1) return (unsigned char)ch;
+    }
+    return -1;
+#endif
+}
+
+/* Blocking get char (with echo off on POSIX) */
+static int getch_block(void) {
+#ifdef _WIN32
+    return _getch();
+#else
+    struct termios oldt, newt;
+    tcgetattr(0, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(0, TCSANOW, &newt);
+    int c = getchar();
+    tcsetattr(0, TCSANOW, &oldt);
+    return c;
+#endif
+}
+
+/* print centered string on row */
+static void print_center(int row, const char *s) {
+    int len = (int)strlen(s);
+    int col = (s_cols - len) / 2;
+    if (col < 0) col = 0;
+    move_cursor(row, col);
+    printf("%s", s);
+}
+
+static void flush_out(void) { fflush(stdout); }
+
+/* ------------------ Persistence & history ------------------ */
+static void add_history(const char *action, const book_t *b) {
+    if (s_history_count >= (int)(sizeof(s_history)/sizeof(s_history[0]))) return;
+    hist_t *h = &s_history[s_history_count++];
+    time_t t = time(NULL);
+    struct tm tmp;
+#ifdef _WIN32
+    localtime_s(&tmp, &t);
+#else
+    localtime_r(&t, &tmp);
+#endif
+    strftime(h->when, sizeof(h->when), "%Y-%m-%d %H:%M:%S", &tmp);
+    strncpy(h->action, action, sizeof(h->action)-1);
+    strncpy(h->isbn, b->isbn, sizeof(h->isbn)-1);
+    strncpy(h->title, b->title, sizeof(h->title)-1);
+    FILE *f = fopen(HISTORY_FILENAME, "a");
+    if (f) {
+        fprintf(f, "%s|%s|%s|%s\n", h->when, h->action, h->isbn, h->title);
+        fclose(f);
+    }
+}
+
+int ui_save_db(const char *filename) {
+    const char *fn = filename ? filename : DB_FILENAME;
+    FILE *f = fopen(fn, "w");
+    if (!f) return -1;
+    for (int i = 0; i < s_book_count; ++i) {
+        fprintf(f, "%s|%s|%s|%d|%d|%s\n",
+                s_books[i].isbn,
+                s_books[i].title,
+                s_books[i].author,
+                s_books[i].year,
+                s_books[i].available,
+                s_books[i].notes);
+    }
+    fclose(f);
+    return 0;
+}
+
+int ui_load_db(const char *filename) {
+    const char *fn = filename ? filename : DB_FILENAME;
+    FILE *f = fopen(fn, "r");
+    if (!f) return -1;
+    s_book_count = 0;
+    char line[1024];
+    while (fgets(line, sizeof(line), f)) {
+        char *p = strchr(line, '\n'); if (p) *p = '\0';
+        char *tok = strtok(line, "|"); if (!tok) continue;
+        strncpy(s_books[s_book_count].isbn, tok, sizeof(s_books[s_book_count].isbn)-1);
+        tok = strtok(NULL, "|"); if (!tok) continue;
+        strncpy(s_books[s_book_count].title, tok, sizeof(s_books[s_book_count].title)-1);
+        tok = strtok(NULL, "|"); if (!tok) continue;
+        strncpy(s_books[s_book_count].author, tok, sizeof(s_books[s_book_count].author)-1);
+        tok = strtok(NULL, "|"); if (!tok) continue;
+        s_books[s_book_count].year = atoi(tok);
+        tok = strtok(NULL, "|"); if (!tok) continue;
+        s_books[s_book_count].available = atoi(tok);
+        tok = strtok(NULL, "|"); if (!tok) continue;
+        strncpy(s_books[s_book_count].notes, tok, sizeof(s_books[s_book_count].notes)-1);
+        s_book_count++;
+        if (s_book_count >= (int)(sizeof(s_books)/sizeof(s_books[0]))) break;
+    }
+    fclose(f);
+    /* load history (optional) */
+    FILE *hf = fopen(HISTORY_FILENAME, "r");
+    s_history_count = 0;
+    if (hf) {
+        char l2[1024];
+        while (fgets(l2, sizeof(l2), hf)) {
+            char *p = strchr(l2, '\n'); if (p) *p = '\0';
+            char *t1 = strtok(l2, "|"); if (!t1) continue;
+            char *t2 = strtok(NULL, "|"); if (!t2) continue;
+            char *t3 = strtok(NULL, "|"); if (!t3) continue;
+            char *t4 = strtok(NULL, "|"); if (!t4) continue;
+            hist_t *h = &s_history[s_history_count++];
+            strncpy(h->when, t1, sizeof(h->when)-1);
+            strncpy(h->action, t2, sizeof(h->action)-1);
+            strncpy(h->isbn, t3, sizeof(h->isbn)-1);
+            strncpy(h->title, t4, sizeof(h->title)-1);
+            if (s_history_count >= (int)(sizeof(s_history)/sizeof(s_history[0]))) break;
+        }
+        fclose(hf);
+    }
+    return 0;
+}
+
+/* ------------------ Demo helper ------------------ */
+void ui_add_demo_book(const char *isbn, const char *title, const char *author, int year, int total_stock, int available) {
+    if (s_book_count >= (int)(sizeof(s_books)/sizeof(s_books[0]))) return;
+    strncpy(s_books[s_book_count].isbn, isbn, sizeof(s_books[s_book_count].isbn)-1);
+    strncpy(s_books[s_book_count].title, title, sizeof(s_books[s_book_count].title)-1);
+    strncpy(s_books[s_book_count].author, author, sizeof(s_books[s_book_count].author)-1);
+    s_books[s_book_count].year = year;
+    s_books[s_book_count].total_stock = total_stock;
+    s_books[s_book_count].available = available;
+    s_books[s_book_count].notes[0] = '\0';
+    s_book_count++;
+}
+
+/* Seed 3 demo books if DB empty */
+static void ui_seed_demo_if_empty(void) {
+    if (s_book_count > 0) return;
+    ui_add_demo_book("978-602-01-0001-1", "Pemrograman C Dasar", "Budi Santoso", 2019, 5, 5);
+    ui_add_demo_book("978-602-01-0002-8", "Dasar Jaringan Komputer", "Siti Aminah", 2020, 3, 3);
+    ui_add_demo_book("978-602-01-0003-5", "Cerita Rakyat Jawa", "Agus Wijaya", 2018, 2, 2);
+    /* save DB so files exist after first run */
+    ui_save_db(DB_FILENAME);
+}
+
+/* ------------------ Visual primitives (same as your file) ------------------ */
+/* (draw_frame_box, ci_strstr_index, draw_wavy_title, particle code, draw_book_card etc.)
+   ... exact implementations retained from your original file ...
+   For brevity in this message I keep them unchanged; in your local file, keep the
+   same implementations you posted earlier (no need to retype here).
+*/
+
+/* paste here all the same static helpers you had before:
+   draw_frame_box
+   ci_strstr_index
+   draw_wavy_title
+   init_particles
+   step_and_draw_particles
+   draw_book_card
+   ui_render_book_list
+   ui_show_book_detail
+   flip_card_visual
+   ui_borrow_book_by_index
+   ui_return_book_by_index
+   ui_show_history_timeline
+   ui_input_autocomplete
+   ui_demo_mainloop
+*/
+
+/* ------------------ UI public routines ------------------ */
+int ui_init(void) {
+    enable_ansi_on_windows();
+    query_terminal_size();
+    clearscreen();
+    hide_cursor();
+    s_running = 1;
+    init_particles();
+
+    /* Try load DB; if not found, seed demo books */
+    if (ui_load_db(DB_FILENAME) != 0) {
+        /* DB missing or couldn't read; seed sample books so admin/peminjam can test */
+        ui_seed_demo_if_empty();
+    } else {
+        /* DB loaded; still ensure demo if empty */
+        ui_seed_demo_if_empty();
+    }
+    return 0;
+}
+
+void ui_shutdown(void) {
+    s_running = 0;
+    show_cursor();
+    reset_color();
+    clearscreen();
+    flush_out();
+}

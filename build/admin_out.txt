@@ -1,0 +1,37 @@
+
+================ Inisialisasi Sistem Perpustakaan ================
+[i] Database berhasil dimuat dari 'data/library_db'.
+
+================ Menu Utama - Pilih Peran ================
+1) Admin
+2) Peminjam (Mahasiswa)
+3) Keluar Program
+> 
+================ Menu Admin ================
+[i] Selamat datang, Administrator.
+
+Menu Admin - Pilih aksi:
+1) Tambah Buku Baru
+2) Edit Data Buku
+3) Hapus Buku
+4) Cari & Lihat Detail Buku
+5) Logout / Kembali ke menu utama
+> 
+================ Cari Buku (Admin) ================
+Masukkan kata kunci judul atau ISBN	: [i] Tidak ditemukan buku untuk kata kunci '9781234567897'
+
+Menu Admin - Pilih aksi:
+1) Tambah Buku Baru
+2) Edit Data Buku
+3) Hapus Buku
+4) Cari & Lihat Detail Buku
+5) Logout / Kembali ke menu utama
+> 
+================ Menu Utama - Pilih Peran ================
+1) Admin
+2) Peminjam (Mahasiswa)
+3) Keluar Program
+> 
+================ Program Selesai ================
+[i] Database berhasil disimpan sebelum keluar.
+[i] Terima kasih telah menggunakan Sistem Perpustakaan.

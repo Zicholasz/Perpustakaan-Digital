@@ -169,10 +169,10 @@ static const book_t *search_books_interactive(const library_db_t *db) {
         return NULL;
     }
 
-    printf("[i] Ditemukan %zu hasil (menampilkan max %d):\n", found, SEARCH_RESULTS_CAP);
+    printf("[i] Ditemukan %u hasil (menampilkan max %d):\n", (unsigned int)found, SEARCH_RESULTS_CAP);
     for (size_t i = 0; i < found; ++i) {
-        printf("%2zu) ISBN: %s | Judul: %s | Penulis: %s | Tersedia: %d\n",
-               i+1, results[i]->isbn, results[i]->title, results[i]->author, results[i]->available);
+        printf("%2u) ISBN: %s | Judul: %s | Penulis: %s | Tersedia: %d\n",
+               (unsigned int)(i+1), results[i]->isbn, results[i]->title, results[i]->author, results[i]->available);
     }
 
     printf("Pilih nomor buku untuk detail/pinjam, 0 untuk batal\t: ");
@@ -251,7 +251,7 @@ static void view_loans_for_borrower(const library_db_t *db, const borrower_t *br
         return;
     }
 
-    printf("[i] Menampilkan %zu transaksi:\n", n);
+    printf("[i] Menampilkan %u transaksi:\n", (unsigned int)n);
     for (size_t i = 0; i < n; ++i) {
         loan_t *ln = out[i]; /* pointer internal dari library */
         printf("----\n");

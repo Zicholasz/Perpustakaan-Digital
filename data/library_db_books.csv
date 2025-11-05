@@ -1,0 +1,3 @@
+isbn,title,author,year,total_stock,available,notes
+9781234567897,Sample Book One,Jane Author,2020,3,3,Example sample book for automated tests
+9789876543210,Second Sample Book,John Writer,2018,2,2,Another test book

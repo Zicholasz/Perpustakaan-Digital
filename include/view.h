@@ -10,8 +10,7 @@
 extern "C" {
 #endif
 
-/* include library's public types (book_t, borrower_t, etc.) */
-#include "library.h"
+#include "library.h" /* harus menyediakan book_t, LIB_MAX_* defines */
 
 /* UI lifecycle */
 int ui_init(void);
@@ -24,8 +23,7 @@ int ui_load_db(const char *filename);
 /* Demo/interactive mainloop (blocking) */
 void ui_demo_mainloop(void);
 
-/* demo helper: add a book to the UI's in-memory store
-   Note: fields here correspond to library.h's book_t (isbn,title,author,year,total_stock,available,notes) */
+/* demo helper: add a book to the UI's in-memory store */
 void ui_add_demo_book(const char *isbn, const char *title, const char *author, int year, int total_stock, int available);
 
 /* Book-detail display (animated slide-in) */
