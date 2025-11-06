@@ -6,12 +6,8 @@
  * Standard: ISO C99
  */
 
-#ifndef LIBRARY_H
-#define LIBRARY_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef PERPUSTAKAAN_LIBRARY_H
+#define PERPUSTAKAAN_LIBRARY_H
 
 /* --- Standard includes --- */
 #include <stdio.h>
@@ -249,8 +245,17 @@ void lib_borrower_free(borrower_t *b);
 loan_t *lib_loan_create_empty(void);
 void lib_loan_free(loan_t *l);
 
-#ifdef __cplusplus
-}
-#endif
+/* library core */
+void library_init(void);
+int add_book(const char *title, const char *author); /* returns id or -1 */
+int remove_book(int id); /* returns 0 on success, -1 on fail */
+Book *find_book_by_id(int id); /* NULL if not found */
+int find_books_by_title(const char *query, int *out_ids, int max_out); /* returns count */
+int borrow_book(int id); /* 0 success, -1 fail */
+int return_book(int id); /* 0 success, -1 fail */
+void list_books(void);
 
-#endif /* LIBRARY_H */
+void admin_menu(void);
+void login_peminjam(void);
+
+#endif /* PERPUSTAKAAN_LIBRARY_H */
