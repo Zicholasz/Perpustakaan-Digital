@@ -3,9 +3,8 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "library.h"
-#include "ui.h"
-
+#include "../include/library.h"
+#include "../include/ui.h"
 const char *usernamekey = "user123";
 const char *passwordkey = "pass123";
 

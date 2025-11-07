@@ -26,8 +26,9 @@
 #include <ctype.h>
 #include <time.h>
 
-#include "library.h"
-#include "ui.h"
+#include "../include/library.h"
+#include "../include/ui.h"
+
 
 static char *read_line_local(char *buf, size_t size) {
     if (!buf || size == 0) return NULL;
