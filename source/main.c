@@ -73,6 +73,10 @@ int main(void) {
     /* Initialize library database with default path */
     library_db_t *db;
     lib_status_t err;
+    /* Ensure sample data (books, admin) exists so peminjam can view books. Do this
+       before opening the main DB instance so the newly created files are read. */
+    ensure_sample_data();
+
     db = lib_db_open(NULL, &err);  /* NULL = use default path */
     if (!db || err != LIB_OK) {
         printf("[!] Gagal menginisialisasi database.\n");

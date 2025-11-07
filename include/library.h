@@ -208,6 +208,10 @@ lib_status_t lib_return_book(library_db_t *db,
 lib_status_t lib_mark_book_lost(library_db_t *db,
                                 const char *loan_id,
                                 unsigned long *out_cost);
+/* Allow caller to set payment amount recorded on a loan (e.g., payment for fine/replacement).
+ * This updates the loan's fine_paid field.
+ */
+lib_status_t lib_set_loan_payment(library_db_t *db, const char *loan_id, long amount);
 size_t lib_find_loans_by_borrower(const library_db_t *db,
                                   const char *borrower_id_or_name,
                                   loan_t **out, size_t out_capacity);

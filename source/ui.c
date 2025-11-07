@@ -52,6 +52,7 @@ void ensure_sample_data() {
                 .total_stock = 3,
                 .available = 3,
                 .year = 2018
+                , .price = 30000.00
             },
             {
                 .isbn = "9780545010221",
@@ -60,6 +61,7 @@ void ensure_sample_data() {
                 .total_stock = 5,
                 .available = 5,
                 .year = 2007
+                , .price = 45000.00
             },
             {
                 .isbn = "9780262033848",
@@ -68,6 +70,7 @@ void ensure_sample_data() {
                 .total_stock = 4,
                 .available = 4,
                 .year = 2009
+                , .price = 75000.00
             },
             {
                 .isbn = "9780134685991",
@@ -76,6 +79,7 @@ void ensure_sample_data() {
                 .total_stock = 2,
                 .available = 2,
                 .year = 2017
+                , .price = 60000.00
             }
         };
 
@@ -87,9 +91,9 @@ void ensure_sample_data() {
 
     // Check admin account
     admin_user_t admin_test = {0};
-    if (lib_verify_admin("admin", "admin123", &admin_test) != LIB_OK) {
+    if (lib_verify_admin("Kakak Admin", "a1234", &admin_test) != LIB_OK) {
         // Create default admin account if it doesn't exist
-        lib_add_admin("admin", "admin123");
+        lib_add_admin("Kakak Admin", "1234");
     }
 
     // Always save changes

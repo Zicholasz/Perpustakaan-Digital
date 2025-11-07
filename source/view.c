@@ -54,32 +54,32 @@ static void detect_console_encoding(void) {
 static void init_templates(void) {
     if (!T_top) {
         /* Unicode templates */
-        static const char *u_top = "╔══════════════════════════════════════════════════════════════════╗\n";
-        static const char *u_title = "║                    DETAIL BUKU (Demo UI)                         ║\n";
-        static const char *u_sep = "╠══════════════════════════════════════════════════════════════════╣\n";
-        static const char *u_bottom = "╚══════════════════════════════════════════════════════════════════╝\n";
+        static const char *u_top = "╔════════════════════════════════════════════════════════════════════════╗\n";
+        static const char *u_title = "║                        DETAIL BUKU (Demo UI)                           ║\n";
+        static const char *u_sep = "╠════════════════════════════════════════════════════════════════════════╣\n";
+        static const char *u_bottom = "╚════════════════════════════════════════════════════════════════════════╝\n";
 
-        static const char *ul_top = "╔══════════════════════════════════════════════════════════════════╗\n";
-        static const char *ul_title = "║                      DAFTAR BUKU (Demo UI)                       ║\n";
-        static const char *ul_header1 = "╠════╤═══════════════╤════════════════════╤═══════════╤══════════╣\n";
-        static const char *ul_header2 = "║ No │     ISBN      │       Judul        │  Penulis  │   Stok   ║\n";
-        static const char *ul_header3 = "╠════╪═══════════════╪════════════════════╪═══════════╪══════════╣\n";
-        static const char *ul_row = "║ %s1 │ 9781234567897 │ Demo Book 1       │ Author 1  │    5     ║\n";
-        static const char *ul_bottom = "╚════╧═══════════════╧════════════════════╧═══════════╧══════════╝\n";
+        static const char *ul_top = "╔════════════════════════════════════════════════════════════════════════╗\n";
+        static const char *ul_title = "║                         DAFTAR BUKU (Demo UI)                          ║\n";
+        static const char *ul_header1 = "╠════╤═══════════════╤══════════════════════╤═══════════════╤══════════╣\n";
+        static const char *ul_header2 = "║ No │     ISBN      │        Judul         │   Penulis     │   Stok   ║\n";
+        static const char *ul_header3 = "╠════╪═══════════════╪══════════════════════╪═══════════════╪══════════╣\n";
+        static const char *ul_row = "║ %s1 │ 9781234567897 │ Demo Book 1         │ Author 1      │    5     ║\n";
+        static const char *ul_bottom = "╚════╧═══════════════╧══════════════════════╧═══════════════╧══════════╝\n";
 
         /* ASCII templates */
-        static const char *a_top = "+==================================================================+\n";
-        static const char *a_title = "|                    DETAIL BUKU (Demo UI)                         |\n";
-        static const char *a_sep = "+------------------------------------------------------------------+\n";
-        static const char *a_bottom = "+==================================================================+\n";
+        static const char *a_top = "+====================================================================+\n";
+        static const char *a_title = "|                       DETAIL BUKU (Demo UI)                        |\n";
+        static const char *a_sep = "+--------------------------------------------------------------------+\n";
+        static const char *a_bottom = "+====================================================================+\n";
 
-        static const char *al_top = "+==================================================================+\n";
-        static const char *al_title = "|                      DAFTAR BUKU (Demo UI)                       |\n";
-        static const char *al_header1 = "+----+---------------+--------------------+-----------+----------+\n";
-        static const char *al_header2 = "| No |     ISBN      |       Judul        |  Penulis  |   Stok   |\n";
-        static const char *al_header3 = "+----+---------------+--------------------+-----------+----------+\n";
-        static const char *al_row = "| %s1 | 9781234567897 | Demo Book 1       | Author 1  |    5     |\n";
-        static const char *al_bottom = "+----+---------------+--------------------+-----------+----------+\n";
+        static const char *al_top = "+====================================================================+\n";
+        static const char *al_title = "|                        DAFTAR BUKU (Demo UI)                       |\n";
+        static const char *al_header1 = "+----+---------------+----------------------+---------------+----------+\n";
+        static const char *al_header2 = "| No |     ISBN      |         Judul        |    Penulis    |   Stok   |\n";
+        static const char *al_header3 = "+----+---------------+----------------------+---------------+----------+\n";
+        static const char *al_row = "| %s1 | 9781234567897 | Demo Book 1          | Author 1      |    5     |\n";
+        static const char *al_bottom = "+----+---------------+----------------------+---------------+----------+\n";
 
         if (view_use_ascii) {
             T_top = a_top; T_title = a_title; T_sep = a_sep; T_bottom = a_bottom;
@@ -143,36 +143,36 @@ void ui_show_book_detail(const book_t *b) {
     printf("%s", T_sep);
     if (b) {
         if (view_use_ascii) {
-            printf("| ISBN        : %-47s |\n", b->isbn);
-            printf("| Judul       : %-47s |\n", b->title);
-            printf("| Penulis     : %-47s |\n", b->author);
-            printf("| Tahun Terbit: %-47d |\n", b->year);
-            printf("| Total Stok  : %-47d |\n", b->total_stock);
-            printf("| Tersedia    : %-47d |\n", b->available);
-            printf("|                                                              |\n");
+            printf("| ISBN         : %-60s |\n", b->isbn);
+            printf("| Judul        : %-60s |\n", b->title);
+            printf("| Penulis      : %-60s |\n", b->author);
+            printf("| Tahun Terbit : %-60d |\n", b->year);
+            printf("| Total Stok   : %-60d |\n", b->total_stock);
+            printf("| Tersedia     : %-60d |\n", b->available);
+            printf("|                                                                          |\n");
             if (b->available < b->total_stock)
-                printf("| Status      : %d dari %d buku sedang dipinjam                |\n", b->total_stock - b->available, b->total_stock);
+                printf("| Status       : %d dari %d buku sedang dipinjam                            |\n", b->total_stock - b->available, b->total_stock);
             else
-                printf("| Status      : Semua buku tersedia                           |\n");
+                printf("| Status       : Semua buku tersedia                                       |\n");
             if (b->notes[0] != '\0') {
-                printf("|                                                              |\n");
-                printf("| Catatan     : %-47s |\n", b->notes);
+                printf("|                                                                          |\n");
+                printf("| Catatan      : %-60s |\n", b->notes);
             }
         } else {
-            printf("║ ISBN        : %-47s ║\n", b->isbn);
-            printf("║ Judul       : %-47s ║\n", b->title);
-            printf("║ Penulis     : %-47s ║\n", b->author);
-            printf("║ Tahun Terbit: %-47d ║\n", b->year);
-            printf("║ Total Stok  : %-47d ║\n", b->total_stock);
-            printf("║ Tersedia    : %-47d ║\n", b->available);
-            printf("║                                                              ║\n");
+            printf("║ ISBN         : %-60s ║\n", b->isbn);
+            printf("║ Judul        : %-60s ║\n", b->title);
+            printf("║ Penulis      : %-60s ║\n", b->author);
+            printf("║ Tahun Terbit : %-60d ║\n", b->year);
+            printf("║ Total Stok   : %-60d ║\n", b->total_stock);
+            printf("║ Tersedia     : %-60d ║\n", b->available);
+            printf("║                                                                          ║\n");
             if (b->available < b->total_stock)
-                printf("║ Status      : %d dari %d buku sedang dipinjam                ║\n", b->total_stock - b->available, b->total_stock);
+                printf("║ Status       : %d dari %d buku sedang dipinjam                            ║\n", b->total_stock - b->available, b->total_stock);
             else
-                printf("║ Status      : Semua buku tersedia                           ║\n");
+                printf("║ Status       : Semua buku tersedia                                       ║\n");
             if (b->notes[0] != '\0') {
-                printf("║                                                              ║\n");
-                printf("║ Catatan     : %-47s ║\n", b->notes);
+                printf("║                                                                          ║\n");
+                printf("║ Catatan      : %-60s ║\n", b->notes);
             }
         }
     } else {

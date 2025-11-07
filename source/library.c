@@ -904,6 +904,17 @@ lib_status_t lib_mark_book_lost(library_db_t *db, const char *loan_id, unsigned 
     return LIB_OK;
 }
 
+lib_status_t lib_set_loan_payment(library_db_t *db, const char *loan_id, long amount) {
+    if (!db || !loan_id) return LIB_ERR_INVALID_ARG;
+    for (size_t i = 0; i < db->loans_count; ++i) {
+        if (strcmp(db->loans[i].loan_id, loan_id) == 0) {
+            db->loans[i].fine_paid = amount;
+            return LIB_OK;
+        }
+    }
+    return LIB_ERR_NOT_FOUND;
+}
+
 size_t lib_find_loans_by_borrower(const library_db_t *db, const char *borrower_id_or_name, loan_t **out, size_t out_capacity) {
     if (!db || !borrower_id_or_name || !out) return 0;
     size_t found = 0;

@@ -74,14 +74,14 @@ void menu_admin(library_db_t *db) {
         switch (opt) {
             case 1: {
                 printf("\n=== DAFTAR BUKU ===\n");
-                printf("%-15s %-30s %-20s %-5s %-5s\n", 
-                       "ISBN", "Judul", "Penulis", "Total", "Sedia");
-                printf("------------------------------------------------------------------------\n");
+                printf("%-15s %-30s %-20s %-8s %-7s %s\n",
+                       "ISBN", "Judul", "Penulis", "Harga", "Total", "Sedia");
+                printf("-----------------------------------------------------------------------------------------\n");
                 for (size_t i = 0; i < db->books_count; i++) {
                     const book_t *b = &db->books[i];
-                    printf("%-15s %-30s %-20s %-5d %-5d\n",
-                           b->isbn, b->title, b->author, 
-                           b->total_stock, b->available);
+                    printf("%-15s %-30s %-20s Rp%7.2f %-7d %-5d\n",
+                           b->isbn, b->title, b->author,
+                           b->price, b->total_stock, b->available);
                 }
                 break;
             }
@@ -107,6 +107,9 @@ void menu_admin(library_db_t *db) {
                 if (!read_line_local(buf, sizeof(buf))) break;
                 new_book.total_stock = atoi(buf);
                 new_book.available = new_book.total_stock;
+                printf("Harga buku (mis. 15000.00)\t: ");
+                if (!read_line_local(buf, sizeof(buf))) break;
+                new_book.price = atof(buf);
                 
                 printf("Catatan (opsional)\t: ");
                 if (!read_line_local(buf, sizeof(buf))) break;
@@ -158,14 +161,64 @@ void menu_admin(library_db_t *db) {
                     break;
                 }
 
-                printf("\nBuku: %s\n", b->title);
-                printf("Stok saat ini: %d (tersedia: %d)\n", 
-                       b->total_stock, b->available);
-                printf("Perubahan stok (+/-): ");
+                printf("\n=== Update Stok Buku ===\n");
+                printf("Judul Buku   : %s\n", b->title);
+                printf("Total stok   : %d\n", b->total_stock);
+                printf("Tersedia     : %d\n", b->available);
+                printf("Dipinjam     : %d\n", b->total_stock - b->available);
+                printf("\n1. Tambah stok\n");
+                printf("2. Kurangi stok\n");
+                printf("0. Batal\n");
+                printf("\nPilihan: ");
                 if (!read_line_local(buf, sizeof(buf))) break;
-                int delta = atoi(buf);
-
-                lib_status_t st = lib_update_book_stock(db, b->isbn, delta);
+                int choice = atoi(buf);
+                
+                int delta = 0;
+                lib_status_t st = LIB_OK;
+                if (choice == 1 || choice == 2) {
+                    printf("\nJumlah stok yang akan %s: ", choice == 1 ? "ditambahkan" : "dikurangi");
+                    if (!read_line_local(buf, sizeof(buf))) break;
+                    int amount = atoi(buf);
+                    if (amount <= 0) {
+                        printf("[!] Jumlah harus lebih dari 0\n");
+                        break;
+                    }
+                    delta = choice == 1 ? amount : -amount;
+                    
+                    if (choice == 2 && (-delta > b->available)) {
+                        printf("[!] Stok tersedia tidak cukup untuk dikurangi\n");
+                        break;
+                    }
+                    
+                    printf("\nKonfirmasi perubahan stok? [Y/N]: ");
+                    if (!read_line_local(buf, sizeof(buf)) || 
+                        (buf[0] != 'y' && buf[0] != 'Y' && buf[0] != '\0')) break;
+                        
+                    st = lib_update_book_stock(db, b->isbn, delta);
+                    if (st == LIB_OK) {
+                        printf("Stok berhasil diupdate.\n");
+                        lib_db_save(db);
+                    } else {
+                        printf("[!] Gagal mengupdate stok (kode: %d)\n", (int)st);
+                    }
+                    /* Ask admin if they want to update price */
+                    printf("\nUbah harga buku sekarang? [Y/N]: ");
+                    if (!read_line_local(buf, sizeof(buf))) break;
+                    if (buf[0] == 'y' || buf[0] == 'Y') {
+                        printf("Masukkan harga baru (mis. 15000.00): ");
+                        if (!read_line_local(buf, sizeof(buf))) break;
+                        book_t *bm = lib_find_book_by_isbn_mutable(db, b->isbn);
+                        if (bm) {
+                            bm->price = atof(buf);
+                            printf("Harga berhasil diubah.\n");
+                            lib_db_save(db);
+                        } else {
+                            printf("[!] Gagal menemukan buku untuk mengubah harga.\n");
+                        }
+                    }
+                } else if (choice != 0) {
+                    printf("[!] Pilihan tidak valid.\n");
+                }
                 if (st == LIB_OK) {
                     printf("Stok berhasil diupdate.\n");
                     lib_db_save(db);
