@@ -31,10 +31,10 @@ int login_admin(void) {
     admin_user_t admin = {0};
     
     printf("=== LOGIN ADMIN ===\n");
-    printf("Username\t: ");
+    printf("Username\t: Kakak Admin");
     if (!read_line_local(username, sizeof(username))) return 0;
     
-    printf("Password\t: ");
+    printf("Password\t: 1234");
     if (!read_line_local(password, sizeof(password))) return 0;
     
     if (lib_verify_admin(username, password, &admin) == LIB_OK) {
