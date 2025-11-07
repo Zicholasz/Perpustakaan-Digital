@@ -6,6 +6,9 @@
 #include "library.h"
 #include "ui.h"
 
+const char *usernamekey = "user123";
+const char *passwordkey = "pass123";
+
 /* Helper untuk membaca input */
 static char *read_line_local(char *buf, size_t size) {
     if (!buf || size == 0) return NULL;
