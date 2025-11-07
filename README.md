@@ -5,11 +5,6 @@ Program ini menggunakan konsep **modular programming** dengan beberapa file terp
 
 ---
 
-## 👥 Anggota Tim
-| Nama | Peran |
-|------|--------|
-| Nico | Pengembang modul `library.h`, `library.c`, dan `peminjam.c` |
-| Hans | Pengembang modul `admin.c` dan `main.c` |
 
 ---
 

@@ -247,15 +247,5 @@ void lib_loan_free(loan_t *l);
 
 /* library core */
 void library_init(void);
-int add_book(const char *title, const char *author); /* returns id or -1 */
-int remove_book(int id); /* returns 0 on success, -1 on fail */
-Book *find_book_by_id(int id); /* NULL if not found */
-int find_books_by_title(const char *query, int *out_ids, int max_out); /* returns count */
-int borrow_book(int id); /* 0 success, -1 fail */
-int return_book(int id); /* 0 success, -1 fail */
-void list_books(void);
-
-void admin_menu(void);
-void login_peminjam(void);
 
 #endif /* PERPUSTAKAAN_LIBRARY_H */
