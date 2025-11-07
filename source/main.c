@@ -4,10 +4,10 @@
 #include <ctype.h>
 #include <time.h>
 
-#include "library.h"
-#include "view.h"
-#include "ui.h"
-#include "peminjam.h"
+#include "../include/library.h"
+#include "../include/view.h"
+#include "../include/ui.h"
+#include "../include/peminjam.h"
 
 /* ---------- Helper: safe input ---------- */
 /* read_line: baca line dari stdin ke buffer, trim newline.
@@ -102,14 +102,20 @@ int main(void) {
                 }
                 break;
 
-            case 2:
-                if (login_peminjam()) {
+            case 2: {
+                int lp = login_peminjam();
+                if (lp == 1) {
                     menu_peminjam(db);
+                } else if (lp == 2) {
+                    /* Special: peminjam prompt allowed admin escalation */
+                    printf("Mengalihkan ke menu Admin...\n");
+                    menu_admin(db);
                 } else {
                     printf("Login gagal.\n");
                     press_enter();
                 }
                 break;
+            }
 
             case 3:
                 printf("\n=== DEMO UI ===\n");

@@ -1,0 +1,74 @@
+
+================ MENU UTAMA SISTEM PERPUSTAKAAN UKSW ================
+1. Login sebagai Admin
+2. Login sebagai Peminjam Buku
+3. Tampilkan Demo UI
+4. Keluar Program
+Pilih menu: === LOGIN PEMINJAM ===
+Masukkan NIM (atau 'q' untuk kembali)	: Login berhasil dengan NIM: 99999
+=== REGISTRASI/LOGIN PEMINJAM ===
+Masukkan NIM Anda: [!] Format NIM tidak valid.
+
+================ MENU UTAMA SISTEM PERPUSTAKAAN UKSW ================
+1. Login sebagai Admin
+2. Login sebagai Peminjam Buku
+3. Tampilkan Demo UI
+4. Keluar Program
+Pilih menu: [!] Pilihan tidak valid!
+Press Enter to continue...
+================ MENU UTAMA SISTEM PERPUSTAKAAN UKSW ================
+1. Login sebagai Admin
+2. Login sebagai Peminjam Buku
+3. Tampilkan Demo UI
+4. Keluar Program
+Pilih menu: 
+=== DEMO UI ===
+
+Contoh tampilan daftar buku dengan paging:
+ΓòöΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòù
+Γòæ                      DAFTAR BUKU (Demo UI)                       Γòæ
+ΓòáΓòÉΓòÉΓòÉΓòÉΓòñΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòñΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòñΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòñΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòú
+Γòæ No Γöé     ISBN      Γöé       Judul        Γöé  Penulis  Γöé   Stok   Γòæ
+ΓòáΓòÉΓòÉΓòÉΓòÉΓò¬ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¬ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¬ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¬ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòú
+Γòæ >1 Γöé 9781234567897 Γöé Demo Book 1       Γöé Author 1  Γöé    5     Γòæ
+Γòæ  2 Γöé 9781234567898 Γöé Demo Book 2       Γöé Author 2  Γöé    3     Γòæ
+Γòæ  3 Γöé 9781234567899 Γöé Demo Book 3       Γöé Author 3  Γöé    7     Γòæ
+ΓòÜΓòÉΓòÉΓòÉΓòÉΓòºΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòºΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòºΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòºΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¥
+
+Query: Sample | Page: 1/3 | Selected: 1
+
+Contoh tampilan detail buku:
+ΓòöΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòù
+Γòæ                    DETAIL BUKU (Demo UI)                         Γòæ
+ΓòáΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòú
+Γòæ ISBN        : 9781234567897                                   Γòæ
+Γòæ Judul       : Demo Book                                       Γòæ
+Γòæ Penulis     : Demo Author                                     Γòæ
+Γòæ Tahun Terbit: 2023                                            Γòæ
+Γòæ Total Stok  : 5                                               Γòæ
+Γòæ Tersedia    : 3                                               Γòæ
+Γòæ                                                              Γòæ
+Γòæ Status      : 2 dari 5 buku sedang dipinjam                Γòæ
+Γòæ                                                              Γòæ
+Γòæ Catatan     : Demo book for UI testing                        Γòæ
+ΓòÜΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¥
+Press Enter to continue...
+================ MENU UTAMA SISTEM PERPUSTAKAAN UKSW ================
+1. Login sebagai Admin
+2. Login sebagai Peminjam Buku
+3. Tampilkan Demo UI
+4. Keluar Program
+Pilih menu: [!] Pilihan tidak valid!
+Press Enter to continue...
+================ MENU UTAMA SISTEM PERPUSTAKAAN UKSW ================
+1. Login sebagai Admin
+2. Login sebagai Peminjam Buku
+3. Tampilkan Demo UI
+4. Keluar Program
+Pilih menu: [!] Pilihan tidak valid!
+Press Enter to continue...
+================ MENU UTAMA SISTEM PERPUSTAKAAN UKSW ================
+1. Login sebagai Admin
+2. Login sebagai Peminjam Buku
+3. Tampilkan Demo UI
+4. Keluar P

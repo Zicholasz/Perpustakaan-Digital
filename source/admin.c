@@ -31,10 +31,10 @@ int login_admin(void) {
     admin_user_t admin = {0};
     
     printf("=== LOGIN ADMIN ===\n");
-    printf("Username\t: Kakak Admin");
+    printf("Username\t: ");
     if (!read_line_local(username, sizeof(username))) return 0;
     
-    printf("Password\t: 1234");
+    printf("Password\t: ");
     if (!read_line_local(password, sizeof(password))) return 0;
     
     if (lib_verify_admin(username, password, &admin) == LIB_OK) {
@@ -58,6 +58,10 @@ void menu_admin(library_db_t *db) {
         printf("2. Tambah buku\n");
         printf("3. Hapus buku (by ISBN)\n");
         printf("4. Update stok buku\n");
+    printf("5. Cari buku (judul)\n");
+    printf("6. Lihat history peminjaman\n");
+    printf("7. Tandai pinjaman terlambat sebagai HILANG (by Loan ID)\n");
+    printf("8. Pengaturan (ubah denda / kebijakan penggantian)\n");
         printf("0. Kembali ke menu utama\n");
         printf("Pilihan anda: ");
 
@@ -118,12 +122,26 @@ void menu_admin(library_db_t *db) {
                 printf("Masukkan ISBN buku yang ingin dihapus\t: ");
                 if (!read_line_local(buf, sizeof(buf))) break;
 
-                lib_status_t st = lib_remove_book(db, buf);
-                if (st == LIB_OK) {
-                    printf("Buku berhasil dihapus.\n");
-                    lib_db_save(db);
+                const book_t *b = lib_find_book_by_isbn(db, buf);
+                if (!b) {
+                    printf("[!] Buku tidak ditemukan.\n");
+                    break;
+                }
+                /* Show preview / demo of the book to be deleted */
+                printf("\n=== Preview Buku (akan dihapus) ===\n");
+                lib_print_book(b, stdout);
+                printf("Apakah Anda yakin ingin menghapus buku ini? (y/N): ");
+                if (!read_line_local(buf, sizeof(buf))) break;
+                if (buf[0] == 'y' || buf[0] == 'Y') {
+                    lib_status_t st = lib_remove_book(db, b->isbn);
+                    if (st == LIB_OK) {
+                        printf("Buku berhasil dihapus.\n");
+                        lib_db_save(db);
+                    } else {
+                        printf("[!] Gagal menghapus buku (kode: %d)\n", (int)st);
+                    }
                 } else {
-                    printf("[!] Gagal menghapus buku (kode: %d)\n", (int)st);
+                    printf("Pembatalan: buku tidak dihapus.\n");
                 }
                 break;
             }
@@ -205,6 +223,75 @@ void menu_admin(library_db_t *db) {
                     else if (l->is_returned) printf("Kembali\n");
                     else printf("Dipinjam\n");
                 }
+                break;
+            }
+            case 7: {
+                /* List overdue loans and allow marking one as lost */
+                printf("\n=== PINJAMAN TERLAMBAT ===\n");
+                lib_date_t today = lib_date_from_time_t(time(NULL));
+                int found = 0;
+                for (size_t i = 0; i < db->loans_count; ++i) {
+                    const loan_t *l = &db->loans[i];
+                    if (!l->is_returned) {
+                        int days = lib_date_days_between(l->date_due, today);
+                        if (days > 0) {
+                            const borrower_t *br = lib_find_borrower_by_id(db, l->borrower_id);
+                            printf("Loan ID: %s | ISBN: %s | Borrower: %s | Due: %04d-%02d-%02d | Days late: %d\n",
+                                   l->loan_id, l->isbn, br ? br->name : "(unknown)",
+                                   l->date_due.year, l->date_due.month, l->date_due.day, days);
+                            found++;
+                        }
+                    }
+                }
+                if (found == 0) {
+                    printf("Tidak ada pinjaman terlambat saat ini.\n");
+                    break;
+                }
+
+                printf("Masukkan Loan ID untuk ditandai HILANG (atau kosong untuk batal): ");
+                if (!read_line_local(buf, sizeof(buf))) break;
+                if (buf[0] == '\0') break;
+                unsigned long cost = 0;
+                lib_status_t st = lib_mark_book_lost(db, buf, &cost);
+                if (st == LIB_OK) {
+                    printf("Pinjaman %s ditandai HILANG. Biaya penggantian: %lu\n", buf, cost);
+                    lib_db_save(db);
+                } else {
+                    printf("Gagal menandai hilang (kode: %d).\n", (int)st);
+                }
+                break;
+            }
+            case 8: {
+                /* Settings submenu: view/change fine_per_day and replacement_cost_days */
+                printf("\n=== PENGATURAN ADMIN ===\n");
+                long cur_fine = lib_get_fine_per_day(db);
+                unsigned long cur_days = lib_get_replacement_cost_days(db);
+                printf("Denda per hari saat ini: %ld\n", cur_fine);
+                printf("Replacement cost days (fallback) saat ini: %lu\n", cur_days);
+                printf("Masukkan nilai baru untuk denda per hari (kosong untuk tidak mengubah): ");
+                if (!read_line_local(buf, sizeof(buf))) break;
+                if (buf[0] != '\0') {
+                    long nf = atol(buf);
+                    if (nf >= 0) {
+                        lib_set_fine_per_day(db, nf);
+                        printf("Denda per hari diubah menjadi: %ld\n", nf);
+                    } else {
+                        printf("Nilai tidak valid, tidak diubah.\n");
+                    }
+                }
+                printf("Masukkan nilai baru untuk replacement_cost_days (kosong untuk tidak mengubah): ");
+                if (!read_line_local(buf, sizeof(buf))) break;
+                if (buf[0] != '\0') {
+                    unsigned long nd = strtoul(buf, NULL, 10);
+                    if (nd > 0) {
+                        lib_set_replacement_cost_days(db, nd);
+                        printf("Replacement days diubah menjadi: %lu\n", nd);
+                    } else {
+                        printf("Nilai tidak valid, tidak diubah.\n");
+                    }
+                }
+                /* Persist settings */
+                lib_db_save(db);
                 break;
             }
             case 0:

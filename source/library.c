@@ -27,6 +27,7 @@ static char *my_strdup(const char *str) {
 
 #include <errno.h>
 #include <ctype.h>
+#include <math.h>
 #include <sys/stat.h>
 #include <stdarg.h>
 #if defined(_WIN32) || defined(_WIN64)
@@ -136,6 +137,9 @@ static time_t timegm_portable(struct tm *tm) {
 
 #define INITIAL_CAPACITY LIB_DEFAULT_CAPACITY
 static unsigned long _id_counter = 0;
+
+/* Default replacement-cost multiplier (days) used when DB doesn't override it. */
+#define LIB_REPLACEMENT_COST_DAYS_DEFAULT 30UL
 
 static void trim_newline(char *s) {
     if (!s) return;
@@ -281,6 +285,9 @@ static char *alloc_path_with_suffix(const char *base, const char *suffix) {
     return buf;
 }
 
+/* forward declaration for meta-file reader used during DB open */
+static void read_meta_file(library_db_t *db);
+
 /* ---------- CSV writers to explicit path (used by atomic save) ---------- */
 
 static lib_status_t write_books_csv_to(const library_db_t *db, const char *outfile) {
@@ -295,11 +302,11 @@ static lib_status_t write_books_csv_to(const library_db_t *db, const char *outfi
         fprintf(stderr, "[lib] write_books_csv_to: fopen('%s') failed: %s\n", outfile, strerror(errno));
         return LIB_ERR_IO;
     }
-    if (fprintf(f, "isbn,title,author,year,total_stock,available,notes\n") < 0) { fclose(f); return LIB_ERR_IO; }
+    if (fprintf(f, "isbn,title,author,year,total_stock,available,price,notes\n") < 0) { fclose(f); return LIB_ERR_IO; }
     for (size_t i = 0; i < db->books_count; ++i) {
         const book_t *b = &db->books[i];
-        if (fprintf(f, "%s,%s,%s,%d,%d,%d,%s\n",
-                b->isbn, b->title, b->author, b->year, b->total_stock, b->available, b->notes) < 0) {
+        if (fprintf(f, "%s,%s,%s,%d,%d,%d,%.2f,%s\n",
+                b->isbn, b->title, b->author, b->year, b->total_stock, b->available, b->price, b->notes) < 0) {
             fclose(f); return LIB_ERR_IO;
         }
     }
@@ -386,14 +393,15 @@ static lib_status_t read_books_csv(library_db_t *db, const char *path) {
         char *ctx = NULL;
         char *tok = strtok_r(s, ",", &ctx);
         if (!tok) { free(s); continue; }
-        book_t b; memset(&b,0,sizeof(b));
-        strncpy(b.isbn, tok, LIB_MAX_ISBN-1);
-        tok = strtok_r(NULL, ",", &ctx); if (!tok) { free(s); continue; } strncpy(b.title, tok, LIB_MAX_TITLE-1);
-        tok = strtok_r(NULL, ",", &ctx); if (!tok) { free(s); continue; } strncpy(b.author, tok, LIB_MAX_AUTHOR-1);
-        tok = strtok_r(NULL, ",", &ctx); if (tok) b.year = atoi(tok);
-        tok = strtok_r(NULL, ",", &ctx); if (tok) b.total_stock = atoi(tok);
-        tok = strtok_r(NULL, ",", &ctx); if (tok) b.available = atoi(tok);
-        tok = strtok_r(NULL, "", &ctx); if (tok) strncpy(b.notes, tok, LIB_MAX_NOTES-1);
+    book_t b; memset(&b,0,sizeof(b));
+    strncpy(b.isbn, tok, LIB_MAX_ISBN-1);
+    tok = strtok_r(NULL, ",", &ctx); if (!tok) { free(s); continue; } strncpy(b.title, tok, LIB_MAX_TITLE-1);
+    tok = strtok_r(NULL, ",", &ctx); if (!tok) { free(s); continue; } strncpy(b.author, tok, LIB_MAX_AUTHOR-1);
+    tok = strtok_r(NULL, ",", &ctx); if (tok) b.year = atoi(tok);
+    tok = strtok_r(NULL, ",", &ctx); if (tok) b.total_stock = atoi(tok);
+    tok = strtok_r(NULL, ",", &ctx); if (tok) b.available = atoi(tok);
+    tok = strtok_r(NULL, ",", &ctx); if (tok) b.price = atof(tok);
+    tok = strtok_r(NULL, "", &ctx); if (tok) strncpy(b.notes, tok, LIB_MAX_NOTES-1);
         lib_status_t st = ensure_books_capacity(db); if (st != LIB_OK) { free(s); free(line); fclose(f); free(p); return st; }
         db->books[db->books_count++] = b;
         free(s);
@@ -502,6 +510,7 @@ library_db_t *lib_db_open(const char *path, lib_status_t *err) {
     db->loans = NULL; db->loans_count = db->loans_capacity = 0;
     db->fine_per_day = LIB_DEFAULT_FINE_PER_DAY;
     db->max_book_types = LIB_MAX_BOOK_TYPES;
+    db->replacement_cost_days = LIB_REPLACEMENT_COST_DAYS_DEFAULT;
     if (path) db->db_file_path = my_strdup(path);
     else db->db_file_path = my_strdup(LIB_DEFAULT_DB_FILE);
     if (!db->db_file_path) { free(db); if (err) *err = LIB_ERR_MEMORY; return NULL; }
@@ -509,6 +518,8 @@ library_db_t *lib_db_open(const char *path, lib_status_t *err) {
     (void) read_books_csv(db, db->db_file_path);
     (void) read_borrowers_csv(db, db->db_file_path);
     (void) read_loans_csv(db, db->db_file_path);
+    /* Read persisted policy meta if present (fine_per_day, replacement_cost_days) */
+    (void) read_meta_file(db);
     if (err) *err = LIB_OK;
     return db;
 }
@@ -524,6 +535,7 @@ lib_status_t lib_db_init(library_db_t *db) {
     db->fine_per_day = LIB_DEFAULT_FINE_PER_DAY;
     db->max_book_types = LIB_MAX_BOOK_TYPES;
     db->db_file_path = my_strdup(LIB_DEFAULT_DB_FILE);
+    db->replacement_cost_days = LIB_REPLACEMENT_COST_DAYS_DEFAULT;
     if (!db->db_file_path) return LIB_ERR_MEMORY;
     /* Ensure data directory exists for the default DB path */
     ensure_dir_for_path(db->db_file_path);
@@ -574,6 +586,29 @@ lib_status_t lib_db_save(library_db_t *db) {
     if (replace_file_atomic(tmp_l, final_l) != 0) { free(final_l); free(tmp_l); return LIB_ERR_IO; }
     free(tmp_l); free(final_l);
 
+    /* Meta: write policy file (fine_per_day, replacement_cost_days) */
+    char *final_meta = alloc_path_with_suffix(db->db_file_path, "_meta.cfg");
+    if (final_meta) {
+        size_t tmpm_len = strlen(final_meta) + 5;
+        char *tmp_meta = malloc(tmpm_len);
+        if (tmp_meta) {
+            snprintf(tmp_meta, tmpm_len, "%s.tmp", final_meta);
+            FILE *mf = fopen(tmp_meta, "w");
+            if (mf) {
+                if (fprintf(mf, "fine_per_day=%ld\n", db->fine_per_day) < 0) { /* ignore */ }
+                if (fprintf(mf, "replacement_cost_days=%lu\n", db->replacement_cost_days) < 0) { /* ignore */ }
+                fflush(mf);
+#if !defined(_WIN32) && !defined(_WIN64)
+                fsync(fileno(mf));
+#endif
+                fclose(mf);
+                replace_file_atomic(tmp_meta, final_meta);
+            }
+            free(tmp_meta);
+        }
+        free(final_meta);
+    }
+
     return LIB_OK;
 }
 
@@ -585,6 +620,27 @@ lib_status_t lib_db_close(library_db_t *db) {
     if (db->db_file_path) free(db->db_file_path);
     free(db);
     return LIB_OK;
+}
+
+/* Read meta file if present: simple key=value lines */
+static void read_meta_file(library_db_t *db) {
+    if (!db || !db->db_file_path) return;
+    char *meta = alloc_path_with_suffix(db->db_file_path, "_meta.cfg");
+    if (!meta) return;
+    FILE *f = fopen(meta, "r");
+    if (!f) { free(meta); return; }
+    char *line = NULL; size_t len = 0; ssize_t r;
+    while ((r = getline(&line, &len, f)) != -1) {
+        trim_newline(line);
+        if (line[0] == '\0') continue;
+        char *eq = strchr(line, '=');
+        if (!eq) continue;
+        *eq = '\0'; char *key = line; char *val = eq + 1;
+        if (strcmp(key, "fine_per_day") == 0) db->fine_per_day = atol(val);
+        else if (strcmp(key, "replacement_cost_days") == 0) db->replacement_cost_days = strtoul(val, NULL, 10);
+    }
+    if (line) free(line);
+    fclose(f); free(meta);
 }
 
 /* ---------- max_book_types API ---------- */
@@ -755,16 +811,52 @@ lib_status_t lib_return_book(library_db_t *db, const char *loan_id, lib_date_t d
     for (size_t i = 0; i < db->loans_count; ++i) if (strcmp(db->loans[i].loan_id, loan_id) == 0) { li = i; break; }
     if (li == SIZE_MAX) return LIB_ERR_NOT_FOUND;
     loan_t *ln = &db->loans[li];
+    /* If the loan was already returned or marked as lost, do not accept a normal return */
     if (ln->is_returned) return LIB_ERR_INVALID_ARG;
+    if (ln->is_lost) return LIB_ERR_INVALID_ARG;
+
     ln->is_returned = true;
     ln->date_returned = date_return;
     unsigned long fine = lib_calculate_fine(db, ln->date_due, date_return);
     ln->fine_paid = fine;
     if (out_fine) *out_fine = fine;
-    if (!ln->is_lost) {
-        for (size_t i = 0; i < db->books_count; ++i) if (strcmp(db->books[i].isbn, ln->isbn) == 0) { db->books[i].available += 1; break; }
+
+    /* Restore available stock safely (don't overflow) */
+    for (size_t i = 0; i < db->books_count; ++i) {
+        if (strcmp(db->books[i].isbn, ln->isbn) == 0) {
+            /* ensure available does not exceed total_stock */
+            if (db->books[i].available < db->books[i].total_stock) db->books[i].available += 1;
+            break;
+        }
     }
     return LIB_OK;
+}
+
+/* Replacement cost policy: default multiplier in days of fine_per_day to estimate replacement cost */
+/* Replacement default days used when DB doesn't override it */
+#define LIB_REPLACEMENT_COST_DAYS_DEFAULT 30UL
+
+lib_status_t lib_set_replacement_cost_days(library_db_t *db, unsigned long days) {
+    if (!db) return LIB_ERR_INVALID_ARG;
+    db->replacement_cost_days = days;
+    return LIB_OK;
+}
+
+unsigned long lib_get_replacement_cost_days(const library_db_t *db) {
+    if (!db) return LIB_REPLACEMENT_COST_DAYS_DEFAULT;
+    return db->replacement_cost_days ? db->replacement_cost_days : LIB_REPLACEMENT_COST_DAYS_DEFAULT;
+}
+
+/* Fine policy accessors */
+lib_status_t lib_set_fine_per_day(library_db_t *db, long fine) {
+    if (!db) return LIB_ERR_INVALID_ARG;
+    db->fine_per_day = fine;
+    return LIB_OK;
+}
+
+long lib_get_fine_per_day(const library_db_t *db) {
+    if (!db) return LIB_DEFAULT_FINE_PER_DAY;
+    return db->fine_per_day;
 }
 
 lib_status_t lib_mark_book_lost(library_db_t *db, const char *loan_id, unsigned long *out_cost) {
@@ -774,16 +866,40 @@ lib_status_t lib_mark_book_lost(library_db_t *db, const char *loan_id, unsigned 
     if (li == SIZE_MAX) return LIB_ERR_NOT_FOUND;
     loan_t *ln = &db->loans[li];
     if (ln->is_lost) return LIB_ERR_INVALID_ARG;
+
+    /* Mark lost. If the book hasn't been returned yet, mark it returned at today
+     * and compute a replacement cost as `fine_per_day * replacement_cost_days`.
+     */
     ln->is_lost = true;
-    unsigned long cost = (unsigned long) db->fine_per_day * 30UL; /* policy */
-    ln->fine_paid = cost;
+    if (!ln->is_returned) {
+        ln->is_returned = true;
+        ln->date_returned = lib_date_from_time_t(time(NULL));
+    }
+
+    /* Prefer computing replacement cost from known book price (persisted). If price is 0 (unknown),
+     * fallback to configured `replacement_cost_days * fine_per_day`.
+     */
+    unsigned long cost = 0;
     for (size_t i = 0; i < db->books_count; ++i) {
         if (strcmp(db->books[i].isbn, ln->isbn) == 0) {
+            double p = db->books[i].price;
+            if (p > 0.0) {
+                /* round to nearest currency unit */
+                cost = (unsigned long) llround(p);
+            } else {
+                unsigned long days = lib_get_replacement_cost_days(db);
+                cost = (unsigned long) db->fine_per_day * days;
+            }
+            /* Adjust library stock: reduce total and available safely (prevent negative values). */
             if (db->books[i].total_stock > 0) db->books[i].total_stock -= 1;
             if (db->books[i].available > 0) db->books[i].available -= 1;
+            /* Ensure available never exceeds total_stock */
+            if (db->books[i].available > db->books[i].total_stock) db->books[i].available = db->books[i].total_stock;
             break;
         }
     }
+    ln->fine_paid = (long) cost;
+
     if (out_cost) *out_cost = cost;
     return LIB_OK;
 }

@@ -92,7 +92,9 @@ typedef struct {
     int year;           /* tahun terbit */
     int total_stock;    /* total kepunyaan perpustakaan */
     int available;      /* stok tersedia */
-    char notes[LIB_MAX_NOTES];
+   /* Harga buku dalam satuan 'currency' (mis. Rupiah). 0 berarti tidak diketahui. */
+   double price;
+   char notes[LIB_MAX_NOTES];
 } book_t;
 
 /* Borrower: tambahan field 'nim' untuk mahasiswa */
@@ -137,6 +139,11 @@ typedef struct {
 
     size_t max_book_types; /* runtime limit */
 
+   /* Replacement cost policy: number of days of fine_per_day used to
+    * estimate replacement cost for a lost book. Default is 30 days.
+    */
+   unsigned long replacement_cost_days;
+
     char *db_file_path;
 } library_db_t;
 
@@ -147,6 +154,14 @@ typedef struct {
 library_db_t *lib_db_open(const char *path, lib_status_t *err);
 lib_status_t lib_db_save(library_db_t *db);
 lib_status_t lib_db_close(library_db_t *db);
+
+/* Replacement-cost policy getters/setters */
+lib_status_t lib_set_replacement_cost_days(library_db_t *db, unsigned long days);
+unsigned long lib_get_replacement_cost_days(const library_db_t *db);
+
+/* Fine policy accessors */
+lib_status_t lib_set_fine_per_day(library_db_t *db, long fine);
+long lib_get_fine_per_day(const library_db_t *db);
 
 /* set/get max book types */
 lib_status_t lib_set_max_book_types(library_db_t *db, size_t max);

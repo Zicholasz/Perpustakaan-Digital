@@ -112,7 +112,7 @@ void menu_peminjam(library_db_t *db) {
     
     printf("=== REGISTRASI/LOGIN PEMINJAM ===\n");
     char nim[32];
-    printf("Masukkan NIM Anda: ");
+    printf("Masukkan NIM Anda\t: ");
     if (!read_line_local(nim, sizeof(nim))) return;
     
     if (!lib_validate_nim_format(nim)) {

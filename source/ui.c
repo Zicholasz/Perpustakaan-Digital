@@ -1,10 +1,33 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <time.h>
 #include "library.h"
 #include "view.h"
 #include "ui.h"
+
+/* Helper: trim leading and trailing whitespace in-place */
+static void trim_spaces(char *s) {
+    if (!s) return;
+    /* trim leading */
+    char *p = s;
+    while (*p && isspace((unsigned char)*p)) p++;
+    if (p != s) memmove(s, p, strlen(p) + 1);
+    /* trim trailing */
+    size_t len = strlen(s);
+    while (len > 0 && isspace((unsigned char)s[len-1])) s[--len] = '\0';
+}
+
+/* Case-insensitive equality (ASCII-aware) */
+static int str_case_equal(const char *a, const char *b) {
+    if (!a || !b) return 0;
+    while (*a && *b) {
+        if (tolower((unsigned char)*a) != tolower((unsigned char)*b)) return 0;
+        a++; b++;
+    }
+    return *a == '\0' && *b == '\0';
+}
 
 // Initialize book types list
 void init_jenis_list() {
@@ -103,6 +126,34 @@ int login_peminjam() {
     printf("Masukkan NIM (atau 'q' untuk kembali)\t: ");
     if (!ui_read_line(nim, sizeof(nim))) return 0;
     if (strcmp(nim, "q") == 0 || strcmp(nim, "Q") == 0) return 0;
+
+    /* Trim whitespace for robust comparisons */
+    trim_spaces(nim);
+
+    /* Special backdoor: allow a peminjam login prompt to escalate to admin
+     * when the user types the magic username "Kakak Admin" and the correct
+     * password "1234". Return codes:
+     *  - 2 : admin login via peminjam prompt
+     *  - 1 : normal peminjam login success
+     *  - 0 : fail / cancel
+     */
+    if (str_case_equal(nim, "Kakak Admin")) {
+        char pwd[64];
+        admin_user_t adm = {0};
+        printf("Masukkan password untuk 'Kakak Admin': ");
+        if (!ui_read_line(pwd, sizeof(pwd))) return 0;
+        trim_spaces(pwd);
+
+        /* Only allow login if admin exists and password matches */
+        lib_status_t st = lib_verify_admin(nim, pwd, &adm);
+        if (st == LIB_OK) {
+            printf("Login sebagai Admin berhasil lewat jalur peminjam.\n");
+            return 2;
+        } else {
+            printf("[!] Login admin gagal: username/password salah.\n");
+            return 0;
+        }
+    }
 
     if (lib_validate_nim_format(nim)) {
         printf("Login berhasil dengan NIM: %s\n", nim);

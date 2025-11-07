@@ -17,9 +17,9 @@ else
     RM = rm -f
 endif
 
-TARGET = app$(EXE)
+TARGET = source/main$(EXE)
 
-.PHONY: all clean run
+.PHONY: all clean run create-admin test
 
 all: $(TARGET)
 
@@ -30,8 +30,16 @@ $(DATA_DIR):
 $(TARGET): $(SRCS)
 	$(CC) $(CFLAGS) -o $@ $(SRCS)
 
+# Build a small helper that creates an admin account without touching the main build.
+# This compiles `source/create_admin.c` with the library implementation and produces
+# `source/create_admin.exe` which can be run to add an admin interactively.
+create-admin:
+	@echo "Building create-admin helper..."
+	$(CC) $(CFLAGS) -o source/create_admin$(EXE) source/create_admin.c source/library.c
+	@echo "Built source/create_admin$(EXE). Run it to create an admin."
+
 clean:
-	-$(RM) $(TARGET) $(OBJS)
+	-$(RM) $(TARGET) $(OBJS) source/create_admin$(EXE) source/main$(EXE)
 
 # convenience: build for windows from unix (mingw cross) if CROSS_CC provided
 windows:
@@ -49,3 +57,20 @@ test: $(TARGET)
 # smoke: quick build + run that immediately exits
 smoke: $(TARGET)
 	@echo 3 | ./$(TARGET)
+
+# Build and run the small fines test program
+.PHONY: test-fines
+test-fines:
+	@echo "Building fines test..."
+	$(CC) $(CFLAGS) -o tests/test_fines$(EXE) tests/test_fines.c source/library.c
+	@echo "Running fines test..."
+	@./tests/test_fines$(EXE)
+
+# test: run program with scripted input (cross-platform). On Windows we use PowerShell
+# to pipe the file; on Unix-like systems we use input redirection.
+test: $(TARGET)
+ifeq ($(OS),Windows_NT)
+	@powershell -NoProfile -Command "Get-Content run_input.txt | .\$(TARGET)"
+else
+	@./$(TARGET) < run_input.txt
+endif

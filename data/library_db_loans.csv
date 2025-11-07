@@ -1,1 +1,2 @@
 loan_id,isbn,borrower_id,date_borrow,date_due,date_returned,is_returned,is_lost,fine_paid
+L17624963357880,9781234567897,B17624962742816,2025-11-07,2025-11-14,2025-11-07,1,0,0
