@@ -7,6 +7,8 @@
         "*.css.liquid": "liquid-css",
         "*.scss.liquid": "liquid-scss",
         "string.h": "c",
-        "library.h": "c"
+        "library.h": "c",
+        "view.h": "c",
+        "ui.h": "c"
     }
 }

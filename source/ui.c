@@ -3,9 +3,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#include "library.h"
-#include "view.h"
-#include "ui.h"
+#include "../include/library.h"
+#include "../include/view.h"
+#include "../include/ui.h"
 
 /* Helper: trim leading and trailing whitespace in-place */
 static void trim_spaces(char *s) {

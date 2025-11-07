@@ -12,7 +12,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <string.h>
-#include "library.h"
+#include "../include/library.h"
 
 /* Our own strdup implementation */
 static char *my_strdup(const char *str) {
