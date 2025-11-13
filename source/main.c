@@ -8,6 +8,7 @@
 #include "../include/view.h"
 #include "../include/ui.h"
 #include "../include/peminjam.h"
+#include "../include/animation.h"
 
 /* ---------- Helper: safe input ---------- */
 /* read_line: baca line dari stdin ke buffer, trim newline.
@@ -70,6 +71,8 @@ int main(void) {
     /* Initialize UI */
     ui_init();
 
+    /* Always show the animation demo on startup per user preference (option B). */
+    animation_run_demo();
     /* Initialize library database with default path */
     library_db_t *db;
     lib_status_t err;
@@ -88,11 +91,14 @@ int main(void) {
 
     int running = 1;
     while (running) {
+        /* Clear any leftover animation output before rendering main menu */
+        ui_clear_screen();
         print_header("MENU UTAMA SISTEM PERPUSTAKAAN UKSW");
         printf("1. Login sebagai Admin\n");
         printf("2. Login sebagai Peminjam Buku\n");
-        printf("3. Tampilkan Demo UI\n");
-        printf("4. Keluar Program\n");
+            printf("3. Tampilkan Demo UI\n");
+            printf("4. Ubah Tema / Background\n");
+            printf("5. Keluar Program\n");
         printf("Pilih menu: ");
 
         int choice = read_int_choice();
@@ -123,10 +129,16 @@ int main(void) {
 
             case 3:
                 printf("\n=== DEMO UI ===\n");
-                printf("\nContoh tampilan daftar buku dengan paging:\n");
-                ui_render_book_list(0, 0, 80, 20, "Sample", 1, 0);
-
-                printf("\nContoh tampilan detail buku:\n");
+                animation_typewriter("[Demo] Menampilkan contoh tampilan...", 25);
+                animation_delay(300);
+                printf("\n--- Contoh Tampilan Daftar Buku ---\n\n");
+                printf("%-15s | %-28s | %-18s | %-10s | %-6s | %s\n",
+                       "ISBN", "Judul", "Pengarang", "Harga", "Total", "Tersedia");
+                printf("%-15s-+-%-28s-+-%-18s-+-%-10s-+-%-6s-+-%s\n",
+                       "===============", "============================", "==================", "==========", "======", "==========");
+                printf("%-15s | %-28s | %-18s | Rp%8.2f | %-6d | %d\n",
+                       "9781234567897", "Demo Book", "Demo Author", 50000.00, 5, 3);
+                printf("\n--- Contoh Tampilan Detail Buku ---\n");
                 book_t sample_book = {
                     .isbn = "9781234567897",
                     .title = "Demo Book",
@@ -140,7 +152,29 @@ int main(void) {
                 press_enter();
                 break;
 
-            case 4:
+                case 4: {
+                    /* Theme/background chooser: present a few 256-color options */
+                    printf("\n=== Pilih Tema Background ===\n\n");
+                    printf("1. Default (reset)\n");
+                    printf("2. Soft parchment (brown)\n");
+                    printf("3. Midnight (dark blue)\n");
+                    printf("4. Forest (dark green)\n\n");
+                    printf("Pilihan : ");
+                    int t = read_int_choice();
+                    switch (t) {
+                        case 2: { int code = 94; animation_set_bg_color(code); ui_save_theme(code); break; }
+                        case 3: { int code = 17; animation_set_bg_color(code); ui_save_theme(code); break; }
+                        case 4: { int code = 22; animation_set_bg_color(code); ui_save_theme(code); break; }
+                        default: { int code = 0; animation_set_bg_color(code); ui_save_theme(code); break; }
+                    }
+                    animation_delay(200);
+                    ui_clear_screen();
+                    printf("Tema berhasil diubah. Jika warna tidak tampil, pastikan terminal mendukung ANSI 256-colors.\n\n");
+                    press_enter();
+                    break;
+                }
+
+            case 5:
                 printf("Terima kasih telah menggunakan Sistem Perpustakaan UKSW!\n");
                 running = 0;
                 break;

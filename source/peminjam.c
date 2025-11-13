@@ -28,6 +28,25 @@
 
 #include "../include/library.h"
 #include "../include/ui.h"
+#include "../include/animation.h"
+
+/* Provide portable case-insensitive compare if platform lacks strcasecmp */
+#if !defined(__APPLE__) && !defined(__unix__) && (defined(_WIN32) || defined(_WIN64))
+/* On some Windows toolchains strcasecmp/_stricmp may not be available; provide small fallback */
+static int portable_strcasecmp(const char *a, const char *b) {
+    if (!a || !b) return (a == b) ? 0 : (a ? 1 : -1);
+    while (*a && *b) {
+        int ca = tolower((unsigned char)*a);
+        int cb = tolower((unsigned char)*b);
+        if (ca != cb) return ca - cb;
+        a++; b++;
+    }
+    return tolower((unsigned char)*a) - tolower((unsigned char)*b);
+}
+#ifndef strcasecmp
+#define strcasecmp portable_strcasecmp
+#endif
+#endif
 
 
 static char *read_line_local(char *buf, size_t size) {
@@ -60,14 +79,25 @@ static int read_int_choice_local(void) {
 /* Tampilkan daftar buku untuk peminjam */
 static void tampilkan_daftar_buku(library_db_t *db) {
     printf("\n=== DAFTAR BUKU ===\n");
-        printf("%-15s %-30s %-20s %-10s %-5s\n", "ISBN", "Judul", "Pengarang", "Harga", "Stok");
-        printf("--------------------------------------------------------------------------------\n");
-    
+    printf("\n%-15s | %-28s | %-18s | %-10s | %-6s | %s\n",
+           "ISBN", "Judul", "Pengarang", "Harga", "Total", "Tersedia");
+    printf("%-15s-+-%-28s-+-%-18s-+-%-10s-+-%-6s-+-%s\n",
+           "===============", 
+           "============================", 
+           "==================",
+           "==========",
+           "======",
+           "=========");
+
     for (size_t i = 0; i < db->books_count; i++) {
         const book_t *b = &db->books[i];
-            printf("%-15s %-30s %-20s Rp%8.2f %-5d\n",
-                   b->isbn, b->title, b->author, b->price, b->available);
+        printf("%-15s | %-28s | %-18s | Rp%8.2f | %-6d | %d\n",
+               b->isbn, 
+               (strlen(b->title) > 28) ? "..." : b->title, 
+               (strlen(b->author) > 18) ? "..." : b->author,
+               b->price, b->total_stock, b->available);
     }
+    printf("\n");
 }
 
 /* Tampilkan pinjaman yang sedang aktif untuk peminjam */
@@ -79,10 +109,11 @@ static void tampilkan_pinjaman_aktif(library_db_t *db, const char *borrower_id) 
         return;
     }
 
-    printf("\n=== PINJAMAN AKTIF ===\n");
-    printf("%-10s %-15s %-30s %-12s %-12s %s\n",
+    printf("\n=== PINJAMAN AKTIF ===\n\n");
+    printf("%-10s | %-13s | %-28s | %-12s | %-12s | %s\n",
            "ID", "ISBN", "Judul", "Tgl Pinjam", "Jatuh Tempo", "Status");
-    printf("--------------------------------------------------------------------------------\n");
+    printf("%-10s-+-%-13s-+-%-28s-+-%-12s-+-%-12s-+-%s\n",
+           "==========", "=============", "============================", "============", "============", "==========");
     
     lib_date_t today = lib_date_from_time_t(time(NULL));
     for (size_t i = 0; i < found; i++) {
@@ -121,10 +152,11 @@ void menu_peminjam(library_db_t *db) {
         return;
     }
     
-    printf("\n=== REGISTRASI/LOGIN PEMINJAM ===\n");
+    printf("\n=== REGISTRASI/LOGIN PEMINJAM ===\n\n");
     char nim[32];
-    printf("Masukkan NIM Anda      : ");
+    printf("NIM Anda              : ");
     if (!read_line_local(nim, sizeof(nim))) return;
+    trim_spaces(nim);
     
     if (!lib_validate_nim_format(nim)) {
         printf("[!] Format NIM tidak valid.\n");
@@ -137,13 +169,19 @@ void menu_peminjam(library_db_t *db) {
         return;
     }
 
+    /* initialize animation once and show welcome */
+    animation_init();
+    animation_typewriter("Selamat datang di Perpustakaan Digital", 30);
+    /* Short pause so the welcome animation is visible before menu content prints */
+    animation_delay(450);
+
     if (current->name[0] == '\0') {
-        printf("\nSilakan lengkapi data Anda:\n");
-        printf("Nama lengkap         : ");
+        printf("\n--- Lengkapi Data Anda ---\n\n");
+        printf("Nama Lengkap          : ");
         read_line_local(current->name, LIB_MAX_NAME);
-        printf("No. Telepon         : ");
+        printf("No. Telepon           : ");
         read_line_local(current->phone, sizeof(current->phone));
-        printf("Email               : ");
+        printf("Email                 : ");
         read_line_local(current->email, sizeof(current->email));
         lib_db_save(db);
         printf("Data berhasil disimpan.\n");
@@ -169,10 +207,15 @@ void menu_peminjam(library_db_t *db) {
         
         switch (opt) {
             case 1:
+                animation_typewriter("[Peminjam] Memuat daftar buku...", 25);
+                animation_delay(300);
+                animation_bookshelf_scan((int)(db->books_count > 12 ? 12 : db->books_count));
                 tampilkan_daftar_buku(db);
                 break;
 
             case 2: {
+                animation_typewriter("[Peminjam] Cari buku...", 25);
+                animation_delay(300);
                 printf("\nMasukkan judul atau kata kunci\t: ");
                 if (!read_line_local(input, sizeof(input))) break;
 
@@ -191,6 +234,8 @@ void menu_peminjam(library_db_t *db) {
             }
                 
             case 3: {
+                animation_typewriter("[Peminjam] Pinjam buku...", 25);
+                animation_delay(300);
                 printf("\nMasukkan ISBN buku yang akan dipinjam: ");
                 if (!read_line_local(input, sizeof(input))) break;
                 
@@ -234,6 +279,7 @@ void menu_peminjam(library_db_t *db) {
                     printf("Tanggal kembali: %04d-%02d-%02d\n", 
                            due_date.year, due_date.month, due_date.day);
                     lib_db_save(db);
+                    animation_loading_bar(400);
                 } else {
                     printf("[!] Gagal meminjam buku (kode: %d)\n", (int)st);
                 }
@@ -241,10 +287,14 @@ void menu_peminjam(library_db_t *db) {
             }
                 
             case 4:
+                animation_typewriter("[Peminjam] Memuat pinjaman aktif Anda...", 25);
+                animation_delay(300);
                 tampilkan_pinjaman_aktif(db, current->id);
                 break;
 
             case 5: {
+                animation_typewriter("[Peminjam] Kembalikan buku...", 25);
+                animation_delay(300);
                 tampilkan_pinjaman_aktif(db, current->id);
                 printf("\nMasukkan ID Pinjaman yang akan dikembalikan: ");
                 if (!read_line_local(input, sizeof(input))) break;
@@ -277,6 +327,7 @@ void menu_peminjam(library_db_t *db) {
                         }
                     }
                     lib_db_save(db);
+                    animation_loading_bar(300);
                 } else {
                     printf("[!] Gagal mengembalikan buku (kode: %d)\n", (int)st);
                 }
@@ -284,6 +335,8 @@ void menu_peminjam(library_db_t *db) {
             }
 
             case 6: {
+                animation_typewriter("[Peminjam] Lapor buku hilang...", 25);
+                animation_delay(300);
                 tampilkan_pinjaman_aktif(db, current->id);
                 printf("\nMasukkan ID Pinjaman yang akan dilaporkan HILANG (atau kosong untuk batal): ");
                 if (!read_line_local(input, sizeof(input))) break;
@@ -330,6 +383,7 @@ void menu_peminjam(library_db_t *db) {
                         }
                     }
                     lib_db_save(db);
+                    animation_loading_bar(400);
                 } else {
                     printf("Gagal menandai hilang (kode: %d).\n", (int)st2);
                 }

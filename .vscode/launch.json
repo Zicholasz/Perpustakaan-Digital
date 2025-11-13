@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Perpustakaan (Build+Run)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\bin\\main.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "preLaunchTask": "Build Project",
+      "MIMode": "gdb",
+      "miDebuggerPath": "gdb"
+    },
+    {
+      "name": "Run Animation Demo",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\bin\\animation_demo.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "preLaunchTask": "Build Animation Demo",
+      "MIMode": "gdb",
+      "miDebuggerPath": "gdb"
+    }
+  ]
+}

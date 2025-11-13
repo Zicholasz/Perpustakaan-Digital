@@ -1,3 +1,4 @@
 isbn,title,author,year,total_stock,available,price,notes
 9781234567897,Sample Book One,Jane Author,2020,4,3,0.00,
 9789876543210,Second Sample Book,John Writer,2018,2,2,0.00,
+999TEST,Test Duplicate Book,Test Author,2025,3,3,5000.00,Notes here

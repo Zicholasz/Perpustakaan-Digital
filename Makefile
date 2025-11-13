@@ -3,7 +3,7 @@ CC ?= gcc
 CFLAGS ?= -std=c99 -Wall -Wextra -Iinclude
 
 SRC_DIR = source
-SRCS = $(SRC_DIR)/library.c $(SRC_DIR)/peminjam.c $(SRC_DIR)/main.c $(SRC_DIR)/admin.c
+SRCS = $(SRC_DIR)/library.c $(SRC_DIR)/peminjam.c $(SRC_DIR)/main.c $(SRC_DIR)/admin.c $(SRC_DIR)/animation.c
 OBJS = $(SRCS:.c=.o)
 
 DATA_DIR = data
@@ -41,6 +41,9 @@ create-admin:
 clean:
 	-$(RM) $(TARGET) $(OBJS) source/create_admin$(EXE) source/main$(EXE)
 
+clean:
+	-$(RM) $(TARGET) $(OBJS) source/create_admin$(EXE) source/main$(EXE) bin/animation_demo$(EXE)
+
 # convenience: build for windows from unix (mingw cross) if CROSS_CC provided
 windows:
 	@if [ -z "$(CROSS_CC)" ]; then echo "Set CROSS_CC (e.g. x86_64-w64-mingw32-gcc)"; exit 1; fi
@@ -65,6 +68,19 @@ test-fines:
 	$(CC) $(CFLAGS) -o tests/test_fines$(EXE) tests/test_fines.c source/library.c
 	@echo "Running fines test..."
 	@./tests/test_fines$(EXE)
+
+.PHONY: test-dup
+test-dup: bin/main$(EXE)
+	@echo "Running duplicate-add test script..."
+	@powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_duplicate_add.ps1
+
+
+# Build the animation demo (local animation demo executable)
+.PHONY: animation-demo
+animation-demo:
+	@echo "Building animation demo..."
+	$(CC) $(CFLAGS) -o bin/animation_demo$(EXE) source/animation.c source/animation_demo.c
+	@echo "Built bin/animation_demo$(EXE). Run it with: ./bin/animation_demo$(EXE)"
 
 # test: run program with scripted input (cross-platform). On Windows we use PowerShell
 # to pipe the file; on Unix-like systems we use input redirection.

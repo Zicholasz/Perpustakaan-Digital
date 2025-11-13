@@ -5,6 +5,7 @@
 
 #include "../include/library.h"
 #include "../include/ui.h"
+#include "../include/animation.h"
 const char *usernamekey = "user123";
 const char *passwordkey = "pass123";
 
@@ -15,6 +16,16 @@ static char *read_line_local(char *buf, size_t size) {
     size_t len = strlen(buf);
     while (len > 0 && (buf[len-1] == '\n' || buf[len-1] == '\r')) buf[--len] = '\0';
     return buf;
+}
+
+/* trim leading and trailing whitespace in-place */
+static void trim_spaces(char *s) {
+    if (!s) return;
+    char *p = s;
+    while (*p && isspace((unsigned char)*p)) p++;
+    if (p != s) memmove(s, p, strlen(p) + 1);
+    size_t len = strlen(s);
+    while (len > 0 && isspace((unsigned char)s[len-1])) s[--len] = '\0';
 }
 
 /* Helper untuk membaca pilihan angka */
@@ -53,6 +64,13 @@ void menu_admin(library_db_t *db) {
         return;
     }
 
+    static int first_enter = 1;
+    if (first_enter) {
+        animation_init();
+        animation_typewriter("Selamat datang, Admin. Memuat menu...", 30);
+        first_enter = 0;
+    }
+
     int running = 1;
     while (running) {
         printf("\n==== ADMIN MENU ====\n");
@@ -72,45 +90,87 @@ void menu_admin(library_db_t *db) {
 
         switch (opt) {
             case 1: {
+                animation_typewriter("[Admin] Memuat daftar buku...", 25);
+                animation_delay(300);
                 printf("\n=== DAFTAR BUKU ===\n");
-                printf("%-15s %-30s %-20s %-8s %-7s %s\n",
-                       "ISBN", "Judul", "Penulis", "Harga", "Total", "Sedia");
-                printf("-----------------------------------------------------------------------------------------\n");
+                /* small shelf scan animation before listing */
+                animation_bookshelf_scan((int)(db->books_count > 12 ? 12 : db->books_count));
+                printf("\n%-15s | %-28s | %-18s | %-10s | %-6s | %s\n",
+                       "ISBN", "Judul", "Penulis", "Harga", "Total", "Tersedia");
+                printf("%-15s-+-%-28s-+-%-18s-+-%-10s-+-%-6s-+-%s\n",
+                       "===============", 
+                       "============================", 
+                       "==================",
+                       "==========",
+                       "======",
+                       "=========");
                 for (size_t i = 0; i < db->books_count; i++) {
                     const book_t *b = &db->books[i];
-                    printf("%-15s %-30s %-20s Rp%7.2f %-7d %-5d\n",
-                           b->isbn, b->title, b->author,
+                    printf("%-15s | %-28s | %-18s | Rp%8.2f | %-6d | %d\n",
+                           b->isbn, 
+                           (strlen(b->title) > 28) ? "..." : b->title, 
+                           (strlen(b->author) > 18) ? "..." : b->author,
                            b->price, b->total_stock, b->available);
                 }
+                printf("\n");
                 break;
             }
             case 2: {
+                animation_typewriter("[Admin] Tambah buku baru...", 25);
+                animation_delay(300);
                 book_t new_book = {0};
-                printf("ISBN\t: ");
+                printf("\n--- Masukkan Data Buku ---\n\n");
+                printf("ISBN                  : ");
                 if (!read_line_local(buf, sizeof(buf))) break;
+                trim_spaces(buf);
                 strncpy(new_book.isbn, buf, LIB_MAX_ISBN-1);
+                /* Early duplicate check: if ISBN exists, offer update instead */
+                {
+                    const book_t *existing = lib_find_book_by_isbn(db, new_book.isbn);
+                    if (existing) {
+                        printf("\n[!] Buku dengan ISBN %s sudah ada: %s (penulis: %s)\n", existing->isbn, existing->title, existing->author);
+                        printf("Ingin memperbarui stok/harga buku ini? [Y/N] : ");
+                        if (!read_line_local(buf, sizeof(buf))) break;
+                        if (buf[0] == 'y' || buf[0] == 'Y') {
+                            printf("Masukkan jumlah stok tambahan (negatif untuk kurangi) : ");
+                            if (!read_line_local(buf, sizeof(buf))) break;
+                            int delta = atoi(buf);
+                            lib_status_t s2 = lib_update_book_stock(db, existing->isbn, delta);
+                            if (s2 == LIB_OK) { printf("Stok diperbarui.\n"); lib_db_save(db); animation_loading_bar(300); }
+                            else printf("[!] Gagal memperbarui stok (kode: %d)\n", (int)s2);
+                            printf("Ingin mengubah harga? [Y/N] : ");
+                            if (!read_line_local(buf, sizeof(buf))) break;
+                            if (buf[0] == 'y' || buf[0] == 'Y') {
+                                printf("Masukkan harga baru      : "); if (!read_line_local(buf, sizeof(buf))) break;
+                                book_t *bm = lib_find_book_by_isbn_mutable(db, existing->isbn);
+                                if (bm) { bm->price = atof(buf); lib_db_save(db); printf("Harga diubah.\n"); }
+                            }
+                        }
+                        break; /* done with add flow */
+                    }
+                }
                 
-                printf("Judul\t: ");
+                printf("Judul                 : ");
                 if (!read_line_local(buf, sizeof(buf))) break;
                 strncpy(new_book.title, buf, LIB_MAX_TITLE-1);
                 
-                printf("Pengarang\t: ");
+                printf("Pengarang             : ");
                 if (!read_line_local(buf, sizeof(buf))) break;
                 strncpy(new_book.author, buf, LIB_MAX_AUTHOR-1);
                 
-                printf("Tahun terbit\t: ");
+                printf("Tahun Terbit          : ");
                 if (!read_line_local(buf, sizeof(buf))) break;
                 new_book.year = atoi(buf);
                 
-                printf("Jumlah stok\t: ");
+                printf("Jumlah Stok           : ");
                 if (!read_line_local(buf, sizeof(buf))) break;
                 new_book.total_stock = atoi(buf);
                 new_book.available = new_book.total_stock;
-                printf("Harga buku (mis. 15000.00)\t: ");
+                printf("Harga Buku (cth: 15000): ");
                 if (!read_line_local(buf, sizeof(buf))) break;
                 new_book.price = atof(buf);
                 
-                printf("Catatan (opsional)\t: ");
+                printf("Catatan (opsional)    : ");
                 if (!read_line_local(buf, sizeof(buf))) break;
                 strncpy(new_book.notes, buf, LIB_MAX_NOTES-1);
 
@@ -118,14 +178,18 @@ void menu_admin(library_db_t *db) {
                 if (st == LIB_OK) {
                     printf("Buku berhasil ditambahkan!\n");
                     lib_db_save(db);
+                    animation_loading_bar(400);
                 } else {
                     printf("[!] Gagal menambah buku (kode: %d)\n", (int)st);
                 }
                 break;
             }
             case 3: {
+                animation_typewriter("[Admin] Hapus buku dari sistem...", 25);
+                animation_delay(300);
                 printf("Masukkan ISBN buku yang ingin dihapus\t: ");
                 if (!read_line_local(buf, sizeof(buf))) break;
+                trim_spaces(buf);
 
                 const book_t *b = lib_find_book_by_isbn(db, buf);
                 if (!b) {
@@ -142,6 +206,7 @@ void menu_admin(library_db_t *db) {
                     if (st == LIB_OK) {
                         printf("Buku berhasil dihapus.\n");
                         lib_db_save(db);
+                        animation_loading_bar(300);
                     } else {
                         printf("[!] Gagal menghapus buku (kode: %d)\n", (int)st);
                     }
@@ -151,8 +216,11 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 4: {
+                animation_typewriter("[Admin] Update stok buku...", 25);
+                animation_delay(300);
                 printf("Masukkan ISBN buku\t: ");
                 if (!read_line_local(buf, sizeof(buf))) break;
+                trim_spaces(buf);
 
                 const book_t *b = lib_find_book_by_isbn(db, buf);
                 if (!b) {
@@ -197,6 +265,7 @@ void menu_admin(library_db_t *db) {
                     if (st == LIB_OK) {
                         printf("Stok berhasil diupdate.\n");
                         lib_db_save(db);
+                        animation_loading_bar(300);
                     } else {
                         printf("[!] Gagal mengupdate stok (kode: %d)\n", (int)st);
                     }
@@ -218,17 +287,15 @@ void menu_admin(library_db_t *db) {
                 } else if (choice != 0) {
                     printf("[!] Pilihan tidak valid.\n");
                 }
-                if (st == LIB_OK) {
-                    printf("Stok berhasil diupdate.\n");
-                    lib_db_save(db);
-                } else {
-                    printf("[!] Gagal mengupdate stok (kode: %d)\n", (int)st);
-                }
+                /* saves/messages already handled inside the choice branches above; avoid duplicate actions */
                 break;
             }
             case 5: {
+                animation_typewriter("[Admin] Cari buku berdasarkan judul...", 25);
+                animation_delay(300);
                 printf("Masukkan judul buku untuk dicari\t: ");
                 if (!read_line_local(buf, sizeof(buf))) break;
+                trim_spaces(buf);
 
                 const book_t *results[64];
                 size_t found = lib_search_books_by_title(db, buf, results, 64);
@@ -244,10 +311,13 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 6: {
-                printf("\n=== HISTORY PEMINJAMAN ===\n");
-                printf("%-10s %-15s %-20s %-12s %-12s %-12s %s\n",
+                animation_typewriter("[Admin] Memuat history peminjaman...", 25);
+                animation_delay(300);
+                printf("\n=== HISTORY PEMINJAMAN ===\n\n");
+                printf("%-10s | %-13s | %-18s | %-12s | %-12s | %-12s | %s\n",
                        "ID", "ISBN", "Peminjam", "Tgl Pinjam", "Jatuh Tempo", "Kembali", "Status");
-                printf("--------------------------------------------------------------------------------\n");
+                printf("%-10s-+-%-13s-+-%-18s-+-%-12s-+-%-12s-+-%-12s-+-%s\n",
+                       "==========", "=============", "==================", "============", "============", "============", "=========");
                 
                 for (size_t i = 0; i < db->loans_count; i++) {
                     const loan_t *l = &db->loans[i];
@@ -281,8 +351,10 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 7: {
+                animation_typewriter("[Admin] Cek pinjaman terlambat...", 25);
+                animation_delay(300);
                 /* List overdue loans and allow marking one as lost */
-                printf("\n=== PINJAMAN TERLAMBAT ===\n");
+                printf("\n=== PINJAMAN TERLAMBAT ===");
                 lib_date_t today = lib_date_from_time_t(time(NULL));
                 int found = 0;
                 for (size_t i = 0; i < db->loans_count; ++i) {
@@ -317,8 +389,10 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 8: {
+                animation_typewriter("[Admin] Pengaturan & kebijakan...", 25);
+                animation_delay(300);
                 /* Settings submenu: view/change fine_per_day and replacement_cost_days */
-                printf("\n=== PENGATURAN ADMIN ===\n");
+                printf("\n=== PENGATURAN ADMIN ===");
                 long cur_fine = lib_get_fine_per_day(db);
                 unsigned long cur_days = lib_get_replacement_cost_days(db);
                 printf("Denda per hari saat ini: %ld\n", cur_fine);

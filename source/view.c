@@ -3,6 +3,8 @@
 #include <string.h>
 #include "../include/library.h"
 #include "../include/view.h"
+#include "../include/animation.h"
+#include "../include/ui.h"
 
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
@@ -96,6 +98,16 @@ int ui_init(void) {
     detect_console_encoding();
     init_templates();
     init_particles();
+    /* Initialize animation (enables VT mode on Windows). First prefer ENV override, otherwise load saved theme. */
+    animation_init();
+    const char *bg = getenv("LIB_BG");
+    if (bg && bg[0] != '\0') {
+        int code = atoi(bg);
+        if (code > 0) animation_set_bg_color(code);
+    } else {
+        int saved = ui_load_theme();
+        if (saved > 0) animation_set_bg_color(saved);
+    }
     return 0;
 }
 

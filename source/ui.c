@@ -6,6 +6,14 @@
 #include "../include/library.h"
 #include "../include/view.h"
 #include "../include/ui.h"
+/* mkdir helper for portability */
+#if defined(_WIN32) || defined(_WIN64)
+#include <direct.h>
+#define MKDIR(path) _mkdir(path)
+#else
+#include <sys/stat.h>
+#define MKDIR(path) mkdir((path), 0755)
+#endif
 
 /* Helper: trim leading and trailing whitespace in-place */
 static void trim_spaces(char *s) {
@@ -110,6 +118,56 @@ void header_tampilan(const char *title) {
 void press_enter() {
     printf("Press Enter to continue...");
     while (getchar() != '\n');
+}
+
+/* Clear screen and reset attributes so menus don't overlap with previous
+   animation output. This sends ANSI reset + clear + home. */
+void ui_clear_screen(void) {
+    /* Clear screen and move cursor home without resetting attributes
+       so a previously-set background color remains visible. Use separate
+       reset (\x1b[0m) only when explicitly requested (e.g. animation_set_bg_color(0)). */
+    printf("\x1b[2J\x1b[H");
+    fflush(stdout);
+}
+
+/* Load theme preference from meta config file. Returns color code (0 = none/reset). */
+int ui_load_theme(void) {
+    const char *path = "data/library_db_meta.cfg";
+    FILE *f = fopen(path, "r");
+    if (!f) return 0;
+    char line[256];
+    int code = 0;
+    while (fgets(line, sizeof(line), f)) {
+        /* trim newline */
+        size_t len = strlen(line);
+        while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r')) line[--len] = '\0';
+        char *eq = strchr(line, '=');
+        if (!eq) continue;
+        *eq = '\0';
+        char *key = line;
+        char *val = eq + 1;
+        trim_spaces(key);
+        trim_spaces(val);
+        if (strcmp(key, "LIB_BG") == 0) {
+            code = atoi(val);
+            break;
+        }
+    }
+    fclose(f);
+    return code;
+}
+
+/* Save theme preference to meta config file (overwrites). Returns 1 on success. */
+int ui_save_theme(int color_code) {
+    const char *dir = "data";
+    const char *path = "data/library_db_meta.cfg";
+    /* Try to create data directory if it doesn't exist (ignore if it already exists) */
+    (void)MKDIR(dir);
+    FILE *f = fopen(path, "w");
+    if (!f) return 0;
+    fprintf(f, "LIB_BG=%d\n", color_code);
+    fclose(f);
+    return 1;
 }
 
 // Helper untuk membaca input dengan aman
