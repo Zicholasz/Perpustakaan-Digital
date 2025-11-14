@@ -207,6 +207,7 @@ void menu_peminjam(library_db_t *db) {
         
         switch (opt) {
             case 1:
+                system("cls");
                 animation_typewriter("[Peminjam] Memuat daftar buku...", 25);
                 animation_delay(300);
                 animation_bookshelf_scan((int)(db->books_count > 12 ? 12 : db->books_count));
@@ -214,6 +215,7 @@ void menu_peminjam(library_db_t *db) {
                 break;
 
             case 2: {
+                system("cls");
                 animation_typewriter("[Peminjam] Cari buku...", 25);
                 animation_delay(300);
                 printf("\nMasukkan judul atau kata kunci\t: ");
@@ -234,6 +236,7 @@ void menu_peminjam(library_db_t *db) {
             }
                 
             case 3: {
+                system("cls");
                 animation_typewriter("[Peminjam] Pinjam buku...", 25);
                 animation_delay(300);
                 printf("\nMasukkan ISBN buku yang akan dipinjam: ");
@@ -287,12 +290,14 @@ void menu_peminjam(library_db_t *db) {
             }
                 
             case 4:
+                system("cls");
                 animation_typewriter("[Peminjam] Memuat pinjaman aktif Anda...", 25);
                 animation_delay(300);
                 tampilkan_pinjaman_aktif(db, current->id);
                 break;
 
             case 5: {
+                system("cls");
                 animation_typewriter("[Peminjam] Kembalikan buku...", 25);
                 animation_delay(300);
                 tampilkan_pinjaman_aktif(db, current->id);
@@ -335,6 +340,7 @@ void menu_peminjam(library_db_t *db) {
             }
 
             case 6: {
+                system("cls");
                 animation_typewriter("[Peminjam] Lapor buku hilang...", 25);
                 animation_delay(300);
                 tampilkan_pinjaman_aktif(db, current->id);
@@ -391,6 +397,7 @@ void menu_peminjam(library_db_t *db) {
             }
 
             case 0:
+                system("cls");
                 printf("Logout berhasil. Sampai jumpa %s!\n", 
                        current->name[0] ? current->name : current->nim);
                 running = 0;
@@ -398,6 +405,8 @@ void menu_peminjam(library_db_t *db) {
             
             default:
                 printf("[!] Pilihan tidak valid.\n");
+                press_enter();
+                system("cls");
                 break;
         }
 

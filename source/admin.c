@@ -90,6 +90,7 @@ void menu_admin(library_db_t *db) {
 
         switch (opt) {
             case 1: {
+                system("cls");
                 animation_typewriter("[Admin] Memuat daftar buku...", 25);
                 animation_delay(300);
                 printf("\n=== DAFTAR BUKU ===\n");
@@ -116,6 +117,7 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 2: {
+                system("cls");
                 animation_typewriter("[Admin] Tambah buku baru...", 25);
                 animation_delay(300);
                 book_t new_book = {0};
@@ -185,6 +187,7 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 3: {
+                system("cls");
                 animation_typewriter("[Admin] Hapus buku dari sistem...", 25);
                 animation_delay(300);
                 printf("Masukkan ISBN buku yang ingin dihapus\t: ");
@@ -216,6 +219,7 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 4: {
+                system("cls");
                 animation_typewriter("[Admin] Update stok buku...", 25);
                 animation_delay(300);
                 printf("Masukkan ISBN buku\t: ");
@@ -291,6 +295,7 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 5: {
+                system("cls");
                 animation_typewriter("[Admin] Cari buku berdasarkan judul...", 25);
                 animation_delay(300);
                 printf("Masukkan judul buku untuk dicari\t: ");
@@ -311,6 +316,7 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 6: {
+                system("cls");
                 animation_typewriter("[Admin] Memuat history peminjaman...", 25);
                 animation_delay(300);
                 printf("\n=== HISTORY PEMINJAMAN ===\n\n");
@@ -351,6 +357,7 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 7: {
+                system("cls");
                 animation_typewriter("[Admin] Cek pinjaman terlambat...", 25);
                 animation_delay(300);
                 /* List overdue loans and allow marking one as lost */
@@ -389,6 +396,7 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 8: {
+                system("cls");
                 animation_typewriter("[Admin] Pengaturan & kebijakan...", 25);
                 animation_delay(300);
                 /* Settings submenu: view/change fine_per_day and replacement_cost_days */
@@ -428,6 +436,8 @@ void menu_admin(library_db_t *db) {
                 break;
             default:
                 printf("[!] Pilihan tidak valid.\n");
+                press_enter();
+                system("cls");
                 break;
         }
 
