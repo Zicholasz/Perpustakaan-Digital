@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -97,8 +96,9 @@ int main(void) {
         printf("1. Login sebagai Admin\n");
         printf("2. Login sebagai Peminjam Buku\n");
             printf("3. Tampilkan Demo UI\n");
-            printf("4. Ubah Tema / Background\n");
-            printf("5. Keluar Program\n");
+            printf("4. Panduan Penggunaan Program\n");
+            printf("5. Credit Pengembang\n");
+            printf("6. Keluar Program\n");
         printf("Pilih menu: ");
 
         int choice = read_int_choice();
@@ -152,29 +152,142 @@ int main(void) {
                 press_enter();
                 break;
 
-                case 4: {
-                    /* Theme/background chooser: present a few 256-color options */
-                    printf("\n=== Pilih Tema Background ===\n\n");
-                    printf("1. Default (reset)\n");
-                    printf("2. Soft parchment (brown)\n");
-                    printf("3. Midnight (dark blue)\n");
-                    printf("4. Forest (dark green)\n\n");
-                    printf("Pilihan : ");
-                    int t = read_int_choice();
-                    switch (t) {
-                        case 2: { int code = 94; animation_set_bg_color(code); ui_save_theme(code); break; }
-                        case 3: { int code = 17; animation_set_bg_color(code); ui_save_theme(code); break; }
-                        case 4: { int code = 22; animation_set_bg_color(code); ui_save_theme(code); break; }
-                        default: { int code = 0; animation_set_bg_color(code); ui_save_theme(code); break; }
-                    }
-                    animation_delay(200);
-                    ui_clear_screen();
-                    printf("Tema berhasil diubah. Jika warna tidak tampil, pastikan terminal mendukung ANSI 256-colors.\n\n");
-                    press_enter();
-                    break;
-                }
+            case 4:
+                ui_clear_screen();
+                printf("\n=== PANDUAN PENGGUNAAN PROGRAM ===\n\n");
+                animation_typewriter("Selamat datang di Sistem Perpustakaan Digital UKSW!", 30);
+                animation_delay(500);
+                printf("\n\n");
+                animation_typewriter("Panduan Lengkap untuk Penggunaan Sistem", 25);
+                printf("\n\n");
+
+                animation_typewriter("1. LOGIN DAN AUTENTIKASI", 20);
+                printf("\n");
+                animation_typewriter("- Admin: Gunakan username 'Kakak Admin' dan password '1234'", 15);
+                printf("\n");
+                animation_typewriter("- Peminjam: Login dengan NIM yang valid (format: 672025XXX)", 15);
+                printf("\n\n");
+
+                animation_typewriter("2. FITUR UNTUK ADMIN", 20);
+                printf("\n");
+                animation_typewriter("- Lihat Daftar Buku: Menampilkan semua buku yang tersedia", 15);
+                printf("\n");
+                animation_typewriter("- Tambah Buku: Menambahkan buku baru dengan ISBN, judul, pengarang, tahun, harga", 15);
+                printf("\n");
+                animation_typewriter("- Hapus Buku: Menghapus buku berdasarkan ISBN", 15);
+                printf("\n");
+                animation_typewriter("- Update Stok Buku: Mengubah jumlah stok buku yang tersedia", 15);
+                printf("\n");
+                animation_typewriter("- Cari Buku: Mencari buku berdasarkan judul", 15);
+                printf("\n");
+                animation_typewriter("- Lihat History Peminjaman: Melihat semua riwayat peminjaman", 15);
+                printf("\n");
+                animation_typewriter("- Tandai Buku Hilang: Menandai pinjaman terlambat sebagai hilang", 15);
+                printf("\n");
+                animation_typewriter("- Pengaturan: Mengubah denda per hari dan kebijakan penggantian", 15);
+                printf("\n\n");
+
+                animation_typewriter("3. FITUR UNTUK PEMINJAM", 20);
+                printf("\n");
+                animation_typewriter("- Lihat Daftar Buku: Melihat semua buku yang tersedia untuk dipinjam", 15);
+                printf("\n");
+                animation_typewriter("- Cari Buku: Mencari buku berdasarkan judul atau ISBN", 15);
+                printf("\n");
+                animation_typewriter("- Pinjam Buku: Meminjam buku dengan batas waktu 7 hari", 15);
+                printf("\n");
+                animation_typewriter("- Lihat Pinjaman Saya: Melihat daftar buku yang sedang dipinjam", 15);
+                printf("\n");
+                animation_typewriter("- Kembalikan Buku: Mengembalikan buku dan membayar denda jika terlambat", 15);
+                printf("\n");
+                animation_typewriter("- Lapor Buku Hilang: Melaporkan buku yang hilang dan membayar biaya penggantian", 15);
+                printf("\n");
+                animation_typewriter("- Lihat History: Melihat riwayat peminjaman pribadi", 15);
+                printf("\n\n");
+
+                animation_typewriter("4. FITUR TAMBAHAN", 20);
+                printf("\n");
+                animation_typewriter("- Demo UI: Menampilkan contoh tampilan antarmuka sistem", 15);
+                printf("\n");
+                animation_typewriter("- Panduan Penggunaan: Menampilkan panduan lengkap ini", 15);
+                printf("\n");
+                animation_typewriter("- Credit Pengembang: Menampilkan informasi pengembang dan terima kasih", 15);
+                printf("\n\n");
+
+                animation_typewriter("5. KETENTUAN DAN KEBIJAKAN", 20);
+                printf("\n");
+                animation_typewriter("- Denda keterlambatan: Rp1.000 per hari", 15);
+                printf("\n");
+                animation_typewriter("- Batas waktu pinjaman: 7 hari dari tanggal peminjaman", 15);
+                printf("\n");
+                animation_typewriter("- Buku hilang: Dikenakan biaya penggantian sesuai harga buku", 15);
+                printf("\n");
+                animation_typewriter("- Maksimal 1 bulan terlambat sebelum dianggap buku hilang", 15);
+                printf("\n\n");
+
+                animation_typewriter("Tekan Enter untuk kembali ke menu utama...", 20);
+                press_enter();
+                break;
 
             case 5:
+                ui_clear_screen();
+                printf("\n=== CREDIT PENGEMBANG ===\n\n");
+                animation_typewriter("SISTEM PERPUSTAKAAN DIGITAL UKSW", 30);
+                printf("\n\n");
+                animation_typewriter("Dikembangkan dengan sepenuh hati oleh Mahasiswa UKSW", 25);
+                printf("\n\n");
+
+                animation_typewriter("DOSEN PEMBIMBING:", 20);
+                printf("\n");
+                animation_typewriter("AFIYATAR ASYER", 15);
+                printf("\n");
+                animation_typewriter("Terima kasih atas bimbingan dan dukungannya!", 15);
+                printf("\n\n");
+
+                animation_typewriter("TIM PENGEMBANG:", 20);
+                printf("\n");
+                animation_typewriter("Nicholas Karsono (672025037)", 15);
+                printf("\n");
+                animation_typewriter("Clemens Vencentio Widjojo (672025044)", 15);
+                printf("\n");
+                animation_typewriter("Elia Hans Hayudyo Purwanto (672025047)", 15);
+                printf("\n");
+                animation_typewriter("Augusta Nayra Naftali (672025055)", 15);
+                printf("\n\n");
+
+                animation_typewriter("TEKNOLOGI & PLATFORM:", 20);
+                printf("\n");
+                animation_typewriter("Bahasa Pemrograman: C (ISO C99)", 15);
+                printf("\n");
+                animation_typewriter("Platform: Windows dengan ANSI Escape Codes", 15);
+                printf("\n");
+                animation_typewriter("Interface: Command Line dengan UI Interaktif", 15);
+                printf("\n\n");
+
+                animation_typewriter("TERIMA KASIH KEPADA:", 20);
+                printf("\n");
+                animation_typewriter("- Dosen Pembimbing yang luar biasa", 15);
+                printf("\n");
+                animation_typewriter("- Asisten Dosen yang telah membantu", 15);
+                printf("\n");
+                animation_typewriter("- UKSW Salatiga yang memberikan inspirasi", 15);
+                printf("\n");
+                animation_typewriter("- Semua pihak yang mendukung pengembangan proyek ini", 15);
+                printf("\n\n");
+
+                animation_typewriter("INFORMASI PROYEK:", 20);
+                printf("\n");
+                animation_typewriter("Versi 1.0", 15);
+                printf("\n");
+                animation_typewriter("Tahun Rilis 2025", 15);
+                printf("\n\n");
+
+                animation_typewriter("Terima kasih telah menggunakan sistem kami!", 20);
+                printf("\n");
+                animation_typewriter("Tekan Enter untuk kembali ke menu utama...", 20);
+                press_enter();
+                break;
+
+            case 6:
                 printf("Terima kasih telah menggunakan Sistem Perpustakaan UKSW!\n");
                 running = 0;
                 break;

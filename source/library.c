@@ -511,6 +511,7 @@ library_db_t *lib_db_open(const char *path, lib_status_t *err) {
     db->fine_per_day = LIB_DEFAULT_FINE_PER_DAY;
     db->max_book_types = LIB_MAX_BOOK_TYPES;
     db->replacement_cost_days = LIB_REPLACEMENT_COST_DAYS_DEFAULT;
+    db->max_overdue_days_before_lost = 30UL; /* Default 30 days */
     if (path) db->db_file_path = my_strdup(path);
     else db->db_file_path = my_strdup(LIB_DEFAULT_DB_FILE);
     if (!db->db_file_path) { free(db); if (err) *err = LIB_ERR_MEMORY; return NULL; }
@@ -536,6 +537,7 @@ lib_status_t lib_db_init(library_db_t *db) {
     db->max_book_types = LIB_MAX_BOOK_TYPES;
     db->db_file_path = my_strdup(LIB_DEFAULT_DB_FILE);
     db->replacement_cost_days = LIB_REPLACEMENT_COST_DAYS_DEFAULT;
+    db->max_overdue_days_before_lost = 30UL; /* Default 30 days */
     if (!db->db_file_path) return LIB_ERR_MEMORY;
     /* Ensure data directory exists for the default DB path */
     ensure_dir_for_path(db->db_file_path);
@@ -586,7 +588,7 @@ lib_status_t lib_db_save(library_db_t *db) {
     if (replace_file_atomic(tmp_l, final_l) != 0) { free(final_l); free(tmp_l); return LIB_ERR_IO; }
     free(tmp_l); free(final_l);
 
-    /* Meta: write policy file (fine_per_day, replacement_cost_days) */
+    /* Meta: write policy file (fine_per_day, replacement_cost_days, max_overdue_days_before_lost) */
     char *final_meta = alloc_path_with_suffix(db->db_file_path, "_meta.cfg");
     if (final_meta) {
         size_t tmpm_len = strlen(final_meta) + 5;
@@ -597,6 +599,7 @@ lib_status_t lib_db_save(library_db_t *db) {
             if (mf) {
                 if (fprintf(mf, "fine_per_day=%ld\n", db->fine_per_day) < 0) { /* ignore */ }
                 if (fprintf(mf, "replacement_cost_days=%lu\n", db->replacement_cost_days) < 0) { /* ignore */ }
+                if (fprintf(mf, "max_overdue_days_before_lost=%lu\n", db->max_overdue_days_before_lost) < 0) { /* ignore */ }
                 fflush(mf);
 #if !defined(_WIN32) && !defined(_WIN64)
                 fsync(fileno(mf));
@@ -638,6 +641,7 @@ static void read_meta_file(library_db_t *db) {
         *eq = '\0'; char *key = line; char *val = eq + 1;
         if (strcmp(key, "fine_per_day") == 0) db->fine_per_day = atol(val);
         else if (strcmp(key, "replacement_cost_days") == 0) db->replacement_cost_days = strtoul(val, NULL, 10);
+        else if (strcmp(key, "max_overdue_days_before_lost") == 0) db->max_overdue_days_before_lost = strtoul(val, NULL, 10);
     }
     if (line) free(line);
     fclose(f); free(meta);
@@ -713,6 +717,49 @@ lib_status_t lib_update_book_stock(library_db_t *db, const char *isbn, int delta
         }
     }
     return LIB_ERR_NOT_FOUND;
+}
+
+lib_status_t lib_update_book(library_db_t *db, const char *isbn, const book_t *updated_book) {
+    if (!db || !isbn || !updated_book) return LIB_ERR_INVALID_ARG;
+    for (size_t i = 0; i < db->books_count; ++i) {
+        if (strcmp(db->books[i].isbn, isbn) == 0) {
+            // Update all fields except ISBN (ISBN is key, cannot change)
+            strncpy(db->books[i].title, updated_book->title, LIB_MAX_TITLE - 1);
+            db->books[i].title[LIB_MAX_TITLE - 1] = '\0';
+            strncpy(db->books[i].author, updated_book->author, LIB_MAX_AUTHOR - 1);
+            db->books[i].author[LIB_MAX_AUTHOR - 1] = '\0';
+            db->books[i].year = updated_book->year;
+            db->books[i].price = updated_book->price;
+            strncpy(db->books[i].notes, updated_book->notes, LIB_MAX_NOTES - 1);
+            db->books[i].notes[LIB_MAX_NOTES - 1] = '\0';
+            // Stock fields are not updated here; use lib_update_book_stock for that
+            return LIB_OK;
+        }
+    }
+    return LIB_ERR_NOT_FOUND;
+}
+
+lib_status_t lib_remove_old_loans(library_db_t *db, unsigned long days_old) {
+    if (!db) return LIB_ERR_INVALID_ARG;
+    lib_date_t today = lib_date_from_time_t(time(NULL));
+    size_t removed = 0;
+    for (size_t i = 0; i < db->loans_count; ) {
+        loan_t *ln = &db->loans[i];
+        if (ln->is_returned && !ln->is_lost) {
+            int days_since_return = lib_date_days_between(ln->date_returned, today);
+            if (days_since_return >= (int)days_old) {
+                // Remove this loan by shifting the rest
+                for (size_t j = i; j + 1 < db->loans_count; ++j) {
+                    db->loans[j] = db->loans[j + 1];
+                }
+                db->loans_count--;
+                removed++;
+                continue; // Do not increment i
+            }
+        }
+        i++;
+    }
+    return LIB_OK; // Always return OK, even if none removed
 }
 
 /* ---------- Borrower management (NIM) ---------- */
@@ -834,7 +881,6 @@ lib_status_t lib_return_book(library_db_t *db, const char *loan_id, lib_date_t d
 
 /* Replacement cost policy: default multiplier in days of fine_per_day to estimate replacement cost */
 /* Replacement default days used when DB doesn't override it */
-#define LIB_REPLACEMENT_COST_DAYS_DEFAULT 30UL
 
 lib_status_t lib_set_replacement_cost_days(library_db_t *db, unsigned long days) {
     if (!db) return LIB_ERR_INVALID_ARG;
@@ -845,6 +891,17 @@ lib_status_t lib_set_replacement_cost_days(library_db_t *db, unsigned long days)
 unsigned long lib_get_replacement_cost_days(const library_db_t *db) {
     if (!db) return LIB_REPLACEMENT_COST_DAYS_DEFAULT;
     return db->replacement_cost_days ? db->replacement_cost_days : LIB_REPLACEMENT_COST_DAYS_DEFAULT;
+}
+
+lib_status_t lib_set_max_overdue_days_before_lost(library_db_t *db, unsigned long days) {
+    if (!db) return LIB_ERR_INVALID_ARG;
+    db->max_overdue_days_before_lost = days;
+    return LIB_OK;
+}
+
+unsigned long lib_get_max_overdue_days_before_lost(const library_db_t *db) {
+    if (!db) return 30UL; /* Default 30 days */
+    return db->max_overdue_days_before_lost ? db->max_overdue_days_before_lost : 30UL;
 }
 
 /* Fine policy accessors */

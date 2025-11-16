@@ -127,6 +127,11 @@ void ui_clear_screen(void) {
        so a previously-set background color remains visible. Use separate
        reset (\x1b[0m) only when explicitly requested (e.g. animation_set_bg_color(0)). */
     printf("\x1b[2J\x1b[H");
+    /* Re-apply current background color if set */
+    extern int current_bg;
+    if (current_bg > 0) {
+        printf("\x1b[48;5;%dm", current_bg % 256);
+    }
     fflush(stdout);
 }
 
@@ -157,15 +162,53 @@ int ui_load_theme(void) {
     return code;
 }
 
-/* Save theme preference to meta config file (overwrites). Returns 1 on success. */
+/* Save theme preference to meta config file (updates LIB_BG key without overwriting others). Returns 1 on success. */
 int ui_save_theme(int color_code) {
     const char *dir = "data";
     const char *path = "data/library_db_meta.cfg";
     /* Try to create data directory if it doesn't exist (ignore if it already exists) */
     (void)MKDIR(dir);
-    FILE *f = fopen(path, "w");
+
+    /* Read existing config */
+    char lines[256][256];
+    int line_count = 0;
+    FILE *f = fopen(path, "r");
+    if (f) {
+        char line[256];
+        while (fgets(line, sizeof(line), f) && line_count < 256) {
+            size_t len = strlen(line);
+            while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r')) line[--len] = '\0';
+            strcpy(lines[line_count++], line);
+        }
+        fclose(f);
+    }
+
+    /* Update or add LIB_BG */
+    int found = 0;
+    for (int i = 0; i < line_count; i++) {
+        char *eq = strchr(lines[i], '=');
+        if (eq) {
+            *eq = '\0';
+            char *key = lines[i];
+            trim_spaces(key);
+            if (strcmp(key, "LIB_BG") == 0) {
+                sprintf(lines[i], "LIB_BG=%d", color_code);
+                found = 1;
+                break;
+            }
+            *eq = '='; /* restore */
+        }
+    }
+    if (!found && line_count < 256) {
+        sprintf(lines[line_count++], "LIB_BG=%d", color_code);
+    }
+
+    /* Write back */
+    f = fopen(path, "w");
     if (!f) return 0;
-    fprintf(f, "LIB_BG=%d\n", color_code);
+    for (int i = 0; i < line_count; i++) {
+        fprintf(f, "%s\n", lines[i]);
+    }
     fclose(f);
     return 1;
 }

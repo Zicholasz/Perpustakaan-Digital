@@ -80,8 +80,9 @@ void menu_admin(library_db_t *db) {
         printf("4. Update stok buku\n");
     printf("5. Cari buku (judul)\n");
     printf("6. Lihat history peminjaman\n");
-    printf("7. Tandai pinjaman terlambat sebagai HILANG (by Loan ID)\n");
-    printf("8. Pengaturan (ubah denda / kebijakan penggantian)\n");
+        printf("7. Tandai pinjaman terlambat sebagai HILANG (by Loan ID)\n");
+        printf("9. Tandai buku hilang secara manual (by Loan ID)\n");
+        printf("10. Pengaturan (ubah denda / kebijakan penggantian)\n");
         printf("0. Kembali ke menu utama\n");
         printf("Pilihan anda: ");
 
@@ -90,7 +91,7 @@ void menu_admin(library_db_t *db) {
 
         switch (opt) {
             case 1: {
-                system("cls");
+                ui_clear_screen();
                 animation_typewriter("[Admin] Memuat daftar buku...", 25);
                 animation_delay(300);
                 printf("\n=== DAFTAR BUKU ===\n");
@@ -117,7 +118,7 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 2: {
-                system("cls");
+                ui_clear_screen();
                 animation_typewriter("[Admin] Tambah buku baru...", 25);
                 animation_delay(300);
                 book_t new_book = {0};
@@ -187,7 +188,7 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 3: {
-                system("cls");
+                ui_clear_screen();
                 animation_typewriter("[Admin] Hapus buku dari sistem...", 25);
                 animation_delay(300);
                 printf("Masukkan ISBN buku yang ingin dihapus\t: ");
@@ -219,7 +220,7 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 4: {
-                system("cls");
+                ui_clear_screen();
                 animation_typewriter("[Admin] Update stok buku...", 25);
                 animation_delay(300);
                 printf("Masukkan ISBN buku\t: ");
@@ -295,7 +296,7 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 5: {
-                system("cls");
+                ui_clear_screen();
                 animation_typewriter("[Admin] Cari buku berdasarkan judul...", 25);
                 animation_delay(300);
                 printf("Masukkan judul buku untuk dicari\t: ");
@@ -316,7 +317,7 @@ void menu_admin(library_db_t *db) {
                 break;
             }
             case 6: {
-                system("cls");
+                ui_clear_screen();
                 animation_typewriter("[Admin] Memuat history peminjaman...", 25);
                 animation_delay(300);
                 printf("\n=== HISTORY PEMINJAMAN ===\n\n");
@@ -324,14 +325,14 @@ void menu_admin(library_db_t *db) {
                        "ID", "ISBN", "Peminjam", "Tgl Pinjam", "Jatuh Tempo", "Kembali", "Status");
                 printf("%-10s-+-%-13s-+-%-18s-+-%-12s-+-%-12s-+-%-12s-+-%s\n",
                        "==========", "=============", "==================", "============", "============", "============", "=========");
-                
+
                 for (size_t i = 0; i < db->loans_count; i++) {
                     const loan_t *l = &db->loans[i];
                     const book_t *b = lib_find_book_by_isbn(db, l->isbn);
                     const borrower_t *br = lib_find_borrower_by_id(db, l->borrower_id);
 
                     char date_borrow[16], date_due[16], date_return[16];
-                    snprintf(date_borrow, sizeof(date_borrow), "%04d-%02d-%02d", 
+                    snprintf(date_borrow, sizeof(date_borrow), "%04d-%02d-%02d",
                             l->date_borrow.year, l->date_borrow.month, l->date_borrow.day);
                     snprintf(date_due, sizeof(date_due), "%04d-%02d-%02d",
                             l->date_due.year, l->date_due.month, l->date_due.day);
@@ -342,7 +343,7 @@ void menu_admin(library_db_t *db) {
                         strcpy(date_return, "-");
                     }
 
-                    printf("%-10s %-15s %-20s %-12s %-12s %-12s ", 
+                    printf("%-10s %-15s %-20s %-12s %-12s %-12s ",
                            l->loan_id,
                            l->isbn,
                            br ? br->name : "???",
@@ -354,19 +355,44 @@ void menu_admin(library_db_t *db) {
                     else if (l->is_returned) printf("Kembali\n");
                     else printf("Dipinjam\n");
                 }
+
+                /* Tambahkan opsi untuk hapus history pinjaman lama */
+                printf("\nApakah Anda ingin menghapus history pinjaman lama? [Y/N]: ");
+                if (!read_line_local(buf, sizeof(buf))) break;
+                if (buf[0] == 'y' || buf[0] == 'Y') {
+                    printf("Masukkan jumlah hari minimum (history yang sudah dikembalikan dan lebih lama dari X hari akan dihapus): ");
+                    if (!read_line_local(buf, sizeof(buf))) break;
+                    unsigned long days = strtoul(buf, NULL, 10);
+                    if (days == 0) {
+                        printf("[!] Jumlah hari harus lebih dari 0.\n");
+                        break;
+                    }
+                    size_t before_count = db->loans_count;
+                    lib_status_t st = lib_remove_old_loans(db, days);
+                    size_t removed = before_count - db->loans_count;
+                    if (st == LIB_OK) {
+                        printf("Berhasil menghapus %zu history pinjaman lama.\n", removed);
+                        lib_db_save(db);
+                        animation_loading_bar(300);
+                    } else {
+                        printf("[!] Gagal menghapus history pinjaman lama (kode: %d)\n", (int)st);
+                    }
+                }
                 break;
             }
             case 7: {
-                system("cls");
+                ui_clear_screen();
                 animation_typewriter("[Admin] Cek pinjaman terlambat...", 25);
                 animation_delay(300);
-                /* List overdue loans and allow marking one as lost */
+                /* Automatically mark loans overdue > max_overdue_days_before_lost as lost */
                 printf("\n=== PINJAMAN TERLAMBAT ===");
                 lib_date_t today = lib_date_from_time_t(time(NULL));
+                unsigned long max_overdue = lib_get_max_overdue_days_before_lost(db);
                 int found = 0;
+                int auto_marked = 0;
                 for (size_t i = 0; i < db->loans_count; ++i) {
-                    const loan_t *l = &db->loans[i];
-                    if (!l->is_returned) {
+                    loan_t *l = &db->loans[i];
+                    if (!l->is_returned && !l->is_lost) {
                         int days = lib_date_days_between(l->date_due, today);
                         if (days > 0) {
                             const borrower_t *br = lib_find_borrower_by_id(db, l->borrower_id);
@@ -374,29 +400,57 @@ void menu_admin(library_db_t *db) {
                                    l->loan_id, l->isbn, br ? br->name : "(unknown)",
                                    l->date_due.year, l->date_due.month, l->date_due.day, days);
                             found++;
+                            if ((unsigned long)days > max_overdue) {
+                                unsigned long cost = 0;
+                                lib_status_t st = lib_mark_book_lost(db, l->loan_id, &cost);
+                                if (st == LIB_OK) {
+                                    printf("  -> OTOMATIS DITANDAI HILANG (terlambat > %lu hari). Biaya penggantian: %lu\n", max_overdue, cost);
+                                    auto_marked++;
+                                } else {
+                                    printf("  -> Gagal menandai hilang otomatis (kode: %d).\n", (int)st);
+                                }
+                            }
                         }
                     }
                 }
                 if (found == 0) {
                     printf("Tidak ada pinjaman terlambat saat ini.\n");
-                    break;
-                }
-
-                printf("Masukkan Loan ID untuk ditandai HILANG (atau kosong untuk batal): ");
-                if (!read_line_local(buf, sizeof(buf))) break;
-                if (buf[0] == '\0') break;
-                unsigned long cost = 0;
-                lib_status_t st = lib_mark_book_lost(db, buf, &cost);
-                if (st == LIB_OK) {
-                    printf("Pinjaman %s ditandai HILANG. Biaya penggantian: %lu\n", buf, cost);
-                    lib_db_save(db);
                 } else {
-                    printf("Gagal menandai hilang (kode: %d).\n", (int)st);
+                    printf("\nTotal pinjaman terlambat: %d\n", found);
+                    printf("Otomatis ditandai hilang: %d\n", auto_marked);
+                    if (auto_marked > 0) {
+                        lib_db_save(db);
+                        printf("Perubahan telah disimpan.\n");
+                    }
                 }
                 break;
             }
-            case 8: {
-                system("cls");
+            case 9: {
+                ui_clear_screen();
+                animation_typewriter("[Admin] Tandai buku hilang secara manual...", 25);
+                animation_delay(300);
+                printf("\n=== TANDAI BUKU HILANG MANUAL ===\n");
+                printf("Masukkan Loan ID yang ingin ditandai hilang: ");
+                if (!read_line_local(buf, sizeof(buf))) break;
+                trim_spaces(buf);
+                if (strlen(buf) == 0) {
+                    printf("[!] Loan ID tidak boleh kosong.\n");
+                    break;
+                }
+                unsigned long cost = 0;
+                lib_status_t st = lib_mark_book_lost(db, buf, &cost);
+                if (st == LIB_OK) {
+                    printf("Buku berhasil ditandai hilang.\n");
+                    printf("Biaya penggantian: %lu\n", cost);
+                    lib_db_save(db);
+                    animation_loading_bar(300);
+                } else {
+                    printf("[!] Gagal menandai buku hilang (kode: %d)\n", (int)st);
+                }
+                break;
+            }
+            case 10: {
+                ui_clear_screen();
                 animation_typewriter("[Admin] Pengaturan & kebijakan...", 25);
                 animation_delay(300);
                 /* Settings submenu: view/change fine_per_day and replacement_cost_days */
@@ -437,7 +491,7 @@ void menu_admin(library_db_t *db) {
             default:
                 printf("[!] Pilihan tidak valid.\n");
                 press_enter();
-                system("cls");
+                ui_clear_screen();
                 break;
         }
 

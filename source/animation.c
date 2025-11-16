@@ -21,6 +21,7 @@
 #endif
 
 static int g_vt_enabled = 0;
+int current_bg = 0;
 
 void animation_init(void) {
 #ifdef _WIN32
@@ -55,7 +56,7 @@ void animation_typewriter(const char *text, int ms_per_char) {
     for (size_t i = 0; i < strlen(text); ++i) {
         putchar(text[i]);
         fflush(stdout);
-        msleep(ms_per_char);
+        msleep(5);  // Very fast typing
     }
     putchar('\n');
     /* ensure attributes reset after typing */
@@ -65,17 +66,17 @@ void animation_typewriter(const char *text, int ms_per_char) {
 
 void animation_book_opening(int repeats) {
     const char *frame1 = "  ____________\n /           /|\n/___________/ |\n|  __  __  |  |\n| |  ||  | |  |\n|_|__||__|_|  |\n  (Library)   |\n  -----------/\n";
-    const char *frame2 = "   ____\n  / ___| ___  _ __ ___\n | |  _ / _ \\| '_ ` _ \\ \n | |_| | (_) | | | | | |\n  \\____|\\___/|_| |_| |_|\n   (Library)\n";
+    const char *frame2 = "   ____\n  / ___| ___  _ __ ___\n | |  _ / _ \\| '_ ` _ _\\ \n | |_| | (_) | | | | | |\n  \\____|\\___/|_| |_| |_|\n   (Library)\n";
 
     for (int r = 0; r < repeats; ++r) {
         printf("\x1b[2J\x1b[H");
         printf("%s", frame1);
         fflush(stdout);
-        msleep(500);
+        msleep(100);  // Faster
         printf("\x1b[2J\x1b[H");
         printf("%s", frame2);
         fflush(stdout);
-        msleep(500);
+        msleep(100);  // Faster
     }
 }
 
@@ -83,7 +84,7 @@ void animation_bookshelf_scan(int width) {
     if (width < 10) width = 10;
     int pos = 0;
     int dir = 1;
-    for (int t = 0; t < width * 2; ++t) {
+    for (int t = 0; t < width; ++t) {  // Reduce iterations
         printf("\r");
         for (int i = 0; i < width; ++i) {
             /* Using ASCII-friendly glyphs for wide compatibility */
@@ -91,7 +92,7 @@ void animation_bookshelf_scan(int width) {
             else printf(" [ bk ] ");
         }
         fflush(stdout);
-        msleep(80);
+        msleep(20);  // Faster
         pos += dir;
         if (pos == width-1 || pos == 0) dir = -dir;
     }
@@ -99,13 +100,13 @@ void animation_bookshelf_scan(int width) {
 }
 
 void animation_loading_bar(int duration_ms) {
-    const int steps = 40;
+    const int steps = 20;  // Reduce steps
     int step_ms = (duration_ms > 0) ? (duration_ms / steps) : 25;
     printf("[");
     for (int i = 0; i < steps; ++i) {
-        printf("#");
+        printf("##");  // Print two at a time
         fflush(stdout);
-        msleep(step_ms);
+        msleep(step_ms / 4);  // Much faster
     }
     printf("] Done\n");
     /* Reset attributes to avoid leaking colors */
@@ -114,7 +115,7 @@ void animation_loading_bar(int duration_ms) {
 }
 
 void animation_confetti(int count) {
-    if (count <= 0) count = 20;
+    if (count <= 0) count = 10;  // Reduce count
     srand((unsigned)time(NULL));
     for (int i = 0; i < count; ++i) {
         int x = rand() % 60;
@@ -122,7 +123,7 @@ void animation_confetti(int count) {
         int color = 31 + (rand() % 6);
         printf("\x1b[%d;%dH\x1b[%dm*\x1b[0m", y+2, x+2, color);
         fflush(stdout);
-        msleep(60);
+        msleep(15);  // Faster
     }
     /* Reset attributes and move cursor below the confetti area */
     printf("\x1b[0m\x1b[12;1H");
@@ -131,17 +132,18 @@ void animation_confetti(int count) {
 int animation_run_demo(void) {
     animation_init();
     printf("\x1b[2J\x1b[H");
-    animation_typewriter("Selamat datang di Perpustakaan Digital", 40);
-    msleep(300);
-    animation_book_opening(2);
-    animation_bookshelf_scan(12);
-    animation_loading_bar(1500);
-    animation_confetti(40);
+    animation_typewriter("Selamat datang di Perpustakaan Digital", 20);
+    msleep(50);  // Faster
+    animation_book_opening(1);
+    animation_bookshelf_scan(8);
+    animation_loading_bar(400);  // Shorter duration
+    animation_confetti(10);  // Fewer confetti
     printf("\n");
     return 0;
 }
 
 void animation_set_bg_color(int color_code) {
+    current_bg = color_code;
     if (color_code <= 0) {
         printf("\x1b[0m"); /* reset all */
         fflush(stdout);
@@ -152,4 +154,8 @@ void animation_set_bg_color(int color_code) {
        console repaints with the new background for subsequent text output */
     printf("\x1b[48;5;%dm\x1b[2J\x1b[H", color_code % 256);
     fflush(stdout);
+}
+
+int animation_get_current_bg(void) {
+    return current_bg;
 }

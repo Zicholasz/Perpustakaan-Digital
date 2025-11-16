@@ -144,6 +144,9 @@ typedef struct {
     */
    unsigned long replacement_cost_days;
 
+   /* Max overdue days before auto-marking as lost. Default is 30 days. */
+   unsigned long max_overdue_days_before_lost;
+
     char *db_file_path;
 } library_db_t;
 
@@ -158,6 +161,10 @@ lib_status_t lib_db_close(library_db_t *db);
 /* Replacement-cost policy getters/setters */
 lib_status_t lib_set_replacement_cost_days(library_db_t *db, unsigned long days);
 unsigned long lib_get_replacement_cost_days(const library_db_t *db);
+
+/* Max overdue days before lost getters/setters */
+lib_status_t lib_set_max_overdue_days_before_lost(library_db_t *db, unsigned long days);
+unsigned long lib_get_max_overdue_days_before_lost(const library_db_t *db);
 
 /* Fine policy accessors */
 lib_status_t lib_set_fine_per_day(library_db_t *db, long fine);
@@ -179,6 +186,8 @@ size_t lib_search_books_by_title(const library_db_t *db,
                                  const book_t **out,
                                  size_t out_capacity);
 lib_status_t lib_update_book_stock(library_db_t *db, const char *isbn, int delta);
+lib_status_t lib_update_book(library_db_t *db, const char *isbn, const book_t *updated_book);
+lib_status_t lib_remove_old_loans(library_db_t *db, unsigned long days_old);
 
 /* -------------------------
    Borrower API (NIM support)
