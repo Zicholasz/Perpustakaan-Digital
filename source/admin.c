@@ -98,58 +98,58 @@ void menu_admin(library_db_t *db) {
                 /* small shelf scan animation before listing */
                 animation_bookshelf_scan((int)(db->books_count > 12 ? 12 : db->books_count));
                 printf("\n%-15s | %-28s | %-18s | %-10s | %-6s | %s\n",
-                       "ISBN", "Judul", "Penulis", "Harga", "Total", "Tersedia");
+                    printf("Username\t: ");
                 printf("%-15s-+-%-28s-+-%-18s-+-%-10s-+-%-6s-+-%s\n",
                        "===============", 
-                       "============================", 
+                    printf("Password\t: ");
                        "==================",
                        "==========",
                        "======",
-                       "=========");
+                                printf("\nMasukkan ISBN buku baru\t: ");
                 for (size_t i = 0; i < db->books_count; i++) {
                     const book_t *b = &db->books[i];
                     printf("%-15s | %-28s | %-18s | Rp%8.2f | %-6d | %d\n",
-                           b->isbn, 
+                                printf("Judul buku\t: ");
                            (strlen(b->title) > 28) ? "..." : b->title, 
                            (strlen(b->author) > 18) ? "..." : b->author,
                            b->price, b->total_stock, b->available);
-                }
+                                printf("Pengarang\t: ");
                 printf("\n");
                 break;
             }
-            case 2: {
+                                printf("Harga\t: ");
                 ui_clear_screen();
                 animation_typewriter("[Admin] Tambah buku baru...", 25);
                 animation_delay(300);
-                book_t new_book = {0};
+                                printf("Stok awal\t: ");
                 printf("\n--- Masukkan Data Buku ---\n\n");
                 printf("ISBN                  : ");
                 if (!read_line_local(buf, sizeof(buf))) break;
                 trim_spaces(buf);
                 strncpy(new_book.isbn, buf, LIB_MAX_ISBN-1);
-                /* Early duplicate check: if ISBN exists, offer update instead */
+                                printf("\nMasukkan ISBN buku yang akan dihapus\t: ");
                 {
                     const book_t *existing = lib_find_book_by_isbn(db, new_book.isbn);
                     if (existing) {
                         printf("\n[!] Buku dengan ISBN %s sudah ada: %s (penulis: %s)\n", existing->isbn, existing->title, existing->author);
-                        printf("Ingin memperbarui stok/harga buku ini? [Y/N] : ");
+                                printf("\nMasukkan ISBN buku yang akan diupdate\t: ");
                         if (!read_line_local(buf, sizeof(buf))) break;
                         if (buf[0] == 'y' || buf[0] == 'Y') {
                             printf("Masukkan jumlah stok tambahan (negatif untuk kurangi) : ");
-                            if (!read_line_local(buf, sizeof(buf))) break;
+                                printf("Judul baru (kosong jika tidak diubah)\t: ");
                             int delta = atoi(buf);
                             lib_status_t s2 = lib_update_book_stock(db, existing->isbn, delta);
-                            if (s2 == LIB_OK) { printf("Stok diperbarui.\n"); lib_db_save(db); animation_loading_bar(300); }
+                                printf("Pengarang baru (kosong jika tidak diubah)\t: ");
                             else printf("[!] Gagal memperbarui stok (kode: %d)\n", (int)s2);
                             printf("Ingin mengubah harga? [Y/N] : ");
-                            if (!read_line_local(buf, sizeof(buf))) break;
+                                printf("Harga baru (0 jika tidak diubah)\t: ");
                             if (buf[0] == 'y' || buf[0] == 'Y') {
                                 printf("Masukkan harga baru      : "); if (!read_line_local(buf, sizeof(buf))) break;
-                                book_t *bm = lib_find_book_by_isbn_mutable(db, existing->isbn);
+                                printf("Stok baru (0 jika tidak diubah)\t: ");
                                 if (bm) { bm->price = atof(buf); lib_db_save(db); printf("Harga diubah.\n"); }
                             }
                         }
-                        break; /* done with add flow */
+                                printf("\nMasukkan NIM peminjam yang akan dihapus\t: ");
                     }
                 }
                 

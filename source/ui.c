@@ -245,7 +245,7 @@ int login_peminjam() {
     if (str_case_equal(nim, "Kakak Admin")) {
         char pwd[64];
         admin_user_t adm = {0};
-        printf("Masukkan password untuk 'Kakak Admin': ");
+        printf("Masukkan password untuk 'Kakak Admin'\t: ");
         if (!ui_read_line(pwd, sizeof(pwd))) return 0;
         trim_spaces(pwd);
 

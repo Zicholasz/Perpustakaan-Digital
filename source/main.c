@@ -99,7 +99,7 @@ int main(void) {
             printf("4. Panduan Penggunaan Program\n");
             printf("5. Credit Pengembang\n");
             printf("6. Keluar Program\n");
-        printf("Pilih menu: ");
+        printf("Pilih menu\t: ");
 
         int choice = read_int_choice();
         switch (choice) {

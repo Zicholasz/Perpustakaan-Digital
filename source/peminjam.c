@@ -168,9 +168,28 @@ static void tampilkan_pinjaman_aktif(library_db_t *db, const char *borrower_id) 
                date_borrow,
                date_due);
 
-        if (l->is_lost) printf("HILANG\n");
-        else if (l->is_returned) printf("Kembali\n");
-        else {
+        // Jika status hilang tapi sudah bayar penggantian, anggap sudah kembali
+        unsigned long cost = 0;
+        if (l->is_lost) {
+            // Hitung biaya penggantian
+            const book_t *b2 = lib_find_book_by_isbn(db, l->isbn);
+            if (b2 && b2->price > 0.0) {
+                cost = (unsigned long)llround(b2->price);
+            } else {
+                unsigned long days = lib_get_replacement_cost_days(db);
+                cost = (unsigned long)db->fine_per_day * days;
+            }
+            if ((unsigned long)l->fine_paid == cost && cost > 0) {
+                // Update status di memori agar konsisten
+                ((loan_t*)l)->is_lost = false;
+                ((loan_t*)l)->is_returned = true;
+                printf("Kembali\n");
+            } else {
+                printf("HILANG\n");
+            }
+        } else if (l->is_returned) {
+            printf("Kembali\n");
+        } else {
             int late = lib_date_days_between(l->date_due, today);
             if (late > 0) {
                 printf("TERLAMBAT %d hari\n", late);
@@ -189,7 +208,7 @@ void menu_peminjam(library_db_t *db) {
     
     printf("\n=== REGISTRASI/LOGIN PEMINJAM ===\n\n");
     char nim[32];
-    printf("NIM Anda              : ");
+    printf("NIM Anda\t\t: ");
     if (!read_line_local(nim, sizeof(nim))) return;
     trim_spaces(nim);
     
@@ -212,11 +231,11 @@ void menu_peminjam(library_db_t *db) {
 
     if (current->name[0] == '\0') {
         printf("\n--- Lengkapi Data Anda ---\n\n");
-        printf("Nama Lengkap          : ");
+        printf("Nama Lengkap\t: ");
         read_line_local(current->name, LIB_MAX_NAME);
-        printf("No. Telepon           : ");
+        printf("No. Telepon\t: ");
         read_line_local(current->phone, sizeof(current->phone));
-        printf("Email                 : ");
+        printf("Email\t\t: ");
         read_line_local(current->email, sizeof(current->email));
         lib_db_save(db);
         printf("Data berhasil disimpan.\n");
@@ -338,7 +357,7 @@ void menu_peminjam(library_db_t *db) {
                 animation_typewriter("[Peminjam] Kembalikan buku...", 25);
                 animation_delay(300);
                 tampilkan_pinjaman_aktif(db, current->id);
-                printf("\nMasukkan ID Pinjaman yang akan dikembalikan: ");
+                printf("\nMasukkan ID Pinjaman yang akan dikembalikan\t: ");
                 if (!read_line_local(input, sizeof(input))) break;
 
                 /* Find the loan first to check if it should be marked lost */
@@ -383,8 +402,12 @@ void menu_peminjam(library_db_t *db) {
                             if (paid == cost) {
                                 lib_set_loan_payment(db, input, (long)paid);
                                 printf("Pembayaran penggantian Rp%lu dicatat. Terima kasih.\n", paid);
+                                /* Perbaikan: update status jika sudah bayar penggantian */
+                                found_ln->is_lost = false;
+                                found_ln->is_returned = true;
                                 lib_db_save(db);
                                 animation_loading_bar(400);
+                                printf("Status pinjaman telah diupdate menjadi Kembali.\n");
                                 break;
                             } else {
                                 printf("Jumlah tidak sesuai. Harus tepat Rp%lu. Coba lagi.\n", cost);
@@ -476,7 +499,7 @@ void menu_peminjam(library_db_t *db) {
                 animation_typewriter("[Peminjam] Lapor buku hilang...", 25);
                 animation_delay(300);
                 tampilkan_pinjaman_aktif(db, current->id);
-                printf("\nMasukkan ID Pinjaman yang akan dilaporkan HILANG (atau kosong untuk batal): ");
+                printf("\nMasukkan ID Pinjaman yang akan dilaporkan HILANG (atau kosong untuk batal)\t: ");
                 if (!read_line_local(input, sizeof(input))) break;
                 if (input[0] == '\0') break;
                 /* Find the loan in DB first and validate status before marking lost */
