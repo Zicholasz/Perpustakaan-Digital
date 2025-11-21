@@ -25,6 +25,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
+#include <math.h>
 
 #include "../include/library.h"
 #include "../include/ui.h"
@@ -100,6 +101,40 @@ static void tampilkan_daftar_buku(library_db_t *db) {
     printf("\n");
 }
 
+/* Auto-mark overdue loans as lost for a borrower */
+static void auto_mark_overdue_loans_lost(library_db_t *db, const char *borrower_id) {
+    loan_t *loans[64];
+    size_t found = lib_find_loans_by_borrower(db, borrower_id, loans, 64);
+    if (found == 0) return;
+
+    lib_date_t today = lib_date_from_time_t(time(NULL));
+    unsigned long max_overdue = lib_get_max_overdue_days_before_lost(db);
+    int marked = 0;
+
+    for (size_t i = 0; i < found; i++) {
+        loan_t *l = loans[i];
+        if (!l->is_returned && !l->is_lost) {
+            int late = lib_date_days_between(l->date_due, today);
+            if ((unsigned long)late > max_overdue) {
+                unsigned long cost = 0;
+                lib_status_t st = lib_mark_book_lost(db, l->loan_id, &cost);
+                if (st == LIB_OK) {
+                    marked++;
+                    printf("[!] Pinjaman %s otomatis ditandai HILANG (terlambat > %lu hari). Biaya penggantian: Rp%lu\n",
+                           l->loan_id, max_overdue, cost);
+                } else {
+                    printf("[!] Gagal menandai hilang otomatis untuk %s (kode: %d)\n", l->loan_id, (int)st);
+                }
+            }
+        }
+    }
+
+    if (marked > 0) {
+        lib_db_save(db);
+        printf("[!] %d pinjaman otomatis ditandai hilang. Database disimpan.\n", marked);
+    }
+}
+
 /* Tampilkan pinjaman yang sedang aktif untuk peminjam */
 static void tampilkan_pinjaman_aktif(library_db_t *db, const char *borrower_id) {
     loan_t *loans[64];
@@ -114,25 +149,25 @@ static void tampilkan_pinjaman_aktif(library_db_t *db, const char *borrower_id) 
            "ID", "ISBN", "Judul", "Tgl Pinjam", "Jatuh Tempo", "Status");
     printf("%-10s-+-%-13s-+-%-28s-+-%-12s-+-%-12s-+-%s\n",
            "==========", "=============", "============================", "============", "============", "==========");
-    
+
     lib_date_t today = lib_date_from_time_t(time(NULL));
     for (size_t i = 0; i < found; i++) {
         const loan_t *l = loans[i];
         const book_t *b = lib_find_book_by_isbn(db, l->isbn);
-        
+
         char date_borrow[16], date_due[16];
         snprintf(date_borrow, sizeof(date_borrow), "%04d-%02d-%02d",
                 l->date_borrow.year, l->date_borrow.month, l->date_borrow.day);
         snprintf(date_due, sizeof(date_due), "%04d-%02d-%02d",
                 l->date_due.year, l->date_due.month, l->date_due.day);
-        
+
         printf("%-10s %-15s %-30s %-12s %-12s ",
                l->loan_id,
                l->isbn,
                b ? b->title : "???",
                date_borrow,
                date_due);
-               
+
         if (l->is_lost) printf("HILANG\n");
         else if (l->is_returned) printf("Kembali\n");
         else {
@@ -224,9 +259,9 @@ void menu_peminjam(library_db_t *db) {
                 const book_t *results[64];
                 size_t found = lib_search_books_by_title(db, input, results, 64);
                 if (found > 0) {
-                    printf("\nDitemukan %zu buku:\n", found);
+                    printf("\nDitemukan %lu buku:\n", (unsigned long)found);
                     for (size_t i = 0; i < found; i++) {
-                        printf("\n=== Buku #%zu ===\n", i+1);
+                        printf("\n=== Buku #%lu ===\n", (unsigned long)(i+1));
                         lib_print_book(results[i], stdout);
                     }
                 } else {
@@ -293,6 +328,8 @@ void menu_peminjam(library_db_t *db) {
                 ui_clear_screen();
                 animation_typewriter("[Peminjam] Memuat pinjaman aktif Anda...", 25);
                 animation_delay(300);
+                /* Auto-mark overdue loans as lost before displaying */
+                auto_mark_overdue_loans_lost(db, current->id);
                 tampilkan_pinjaman_aktif(db, current->id);
                 break;
 
@@ -304,37 +341,132 @@ void menu_peminjam(library_db_t *db) {
                 printf("\nMasukkan ID Pinjaman yang akan dikembalikan: ");
                 if (!read_line_local(input, sizeof(input))) break;
 
-                lib_date_t today = lib_date_from_time_t(time(NULL));
-                unsigned long fine = 0;
-                lib_status_t st = lib_return_book(db, input, today, &fine);
-                if (st == LIB_OK) {
-                    printf("Buku berhasil dikembalikan!\n");
-                    if (fine > 0) {
-                        printf("[!] Denda keterlambatan: Rp%lu\n", fine);
-                        /* Require exact payment matching the fine */
+                /* Find the loan first to check if it should be marked lost */
+                loan_t *found_ln = NULL;
+                for (size_t ii = 0; ii < db->loans_count; ++ii) {
+                    if (strcmp(db->loans[ii].loan_id, input) == 0) { found_ln = &db->loans[ii]; break; }
+                }
+                if (!found_ln) {
+                    printf("[!] Loan ID '%s' tidak ditemukan.\n", input);
+                    break;
+                }
+                if (found_ln->is_lost) {
+                    printf("[!] Pinjaman %s sudah ditandai HILANG sebelumnya.\n", input);
+                    /* Allow payment for replacement cost even if already marked lost */
+                    if (found_ln->fine_paid == 0) {
+                        /* Recalculate cost if not set */
+                        const book_t *b = lib_find_book_by_isbn(db, found_ln->isbn);
+                        unsigned long cost = 0;
+                        if (b && b->price > 0.0) {
+                            cost = (unsigned long) llround(b->price);
+                        } else {
+                            unsigned long days = lib_get_replacement_cost_days(db);
+                            cost = (unsigned long) db->fine_per_day * days;
+                        }
+                        found_ln->fine_paid = (long) cost;
+                        lib_db_save(db);
+                    }
+                    unsigned long cost = (unsigned long)found_ln->fine_paid;
+                    if (cost > 0) {
+                        printf("Biaya penggantian: Rp%lu\n", cost);
+                        /* Require exact payment for replacement cost */
                         while (1) {
-                            printf("Masukkan jumlah yang dibayar (harus Rp%lu) atau ketik 'batal' untuk membatalkan: ", fine);
+                            printf("Masukkan jumlah yang dibayarkan untuk penggantian (harus Rp%lu) atau ketik 'batal' untuk membatalkan: ", cost);
                             char paybuf[64];
                             if (!read_line_local(paybuf, sizeof(paybuf))) break;
                             trim_spaces(paybuf);
                             if (strcasecmp(paybuf, "batal") == 0) {
-                                printf("Pembayaran dibatalkan oleh peminjam.\n");
+                                printf("Pembayaran penggantian dibatalkan oleh peminjam.\n");
                                 break;
                             }
                             unsigned long paid = strtoul(paybuf, NULL, 10);
-                            if (paid == fine) {
+                            if (paid == cost) {
                                 lib_set_loan_payment(db, input, (long)paid);
-                                printf("Pembayaran Rp%lu dicatat. Terima kasih.\n", paid);
+                                printf("Pembayaran penggantian Rp%lu dicatat. Terima kasih.\n", paid);
+                                lib_db_save(db);
+                                animation_loading_bar(400);
                                 break;
                             } else {
-                                printf("Jumlah tidak sesuai. Harus tepat Rp%lu. Coba lagi.\n", fine);
+                                printf("Jumlah tidak sesuai. Harus tepat Rp%lu. Coba lagi.\n", cost);
                             }
                         }
+                    } else {
+                        printf("Tidak ada biaya penggantian yang tercatat.\n");
                     }
-                    lib_db_save(db);
-                    animation_loading_bar(300);
+                    break;
+                }
+                if (found_ln->is_returned) {
+                    printf("[!] Pinjaman %s sudah dikembalikan.\n", input);
+                    break;
+                }
+
+                lib_date_t today = lib_date_from_time_t(time(NULL));
+                int late = lib_date_days_between(found_ln->date_due, today);
+                unsigned long max_overdue = lib_get_max_overdue_days_before_lost(db);
+
+                if ((unsigned long)late > max_overdue) {
+                    /* Mark as lost instead of returning */
+                    unsigned long cost = 0;
+                    lib_status_t st2 = lib_mark_book_lost(db, input, &cost);
+                    if (st2 == LIB_OK) {
+                        printf("Pinjaman %s terlambat lebih dari %lu hari dan otomatis ditandai HILANG. Biaya penggantian: Rp%lu\n", input, max_overdue, cost);
+                        /* Require exact payment for replacement cost */
+                        while (1) {
+                            printf("Masukkan jumlah yang dibayarkan untuk penggantian (harus Rp%lu) atau ketik 'batal' untuk membatalkan: ", cost);
+                            char paybuf2[64];
+                            if (!read_line_local(paybuf2, sizeof(paybuf2))) break;
+                            trim_spaces(paybuf2);
+                            if (strcasecmp(paybuf2, "batal") == 0) {
+                                printf("Pembayaran penggantian dibatalkan oleh peminjam.\n");
+                                break;
+                            }
+                            unsigned long paid2 = strtoul(paybuf2, NULL, 10);
+                            if (paid2 == cost) {
+                                lib_set_loan_payment(db, input, (long)paid2);
+                                printf("Pembayaran penggantian Rp%lu dicatat. Terima kasih.\n", paid2);
+                                break;
+                            } else {
+                                printf("Jumlah tidak sesuai. Harus tepat Rp%lu. Coba lagi.\n", cost);
+                            }
+                        }
+                        lib_db_save(db);
+                        animation_loading_bar(400);
+                    } else {
+                        printf("Gagal menandai hilang (kode: %d).\n", (int)st2);
+                    }
                 } else {
-                    printf("[!] Gagal mengembalikan buku (kode: %d)\n", (int)st);
+                    /* Normal return */
+                    unsigned long fine = 0;
+                    lib_status_t st = lib_return_book(db, input, today, &fine);
+                    if (st == LIB_OK) {
+                        printf("Buku berhasil dikembalikan!\n");
+                        if (fine > 0) {
+                            printf("[!] Denda keterlambatan: Rp%lu\n", fine);
+                            /* Require exact payment matching the fine */
+                            while (1) {
+                                printf("Masukkan jumlah yang dibayar (harus Rp%lu) atau ketik 'batal' untuk membatalkan: ", fine);
+                                char paybuf[64];
+                                if (!read_line_local(paybuf, sizeof(paybuf))) break;
+                                trim_spaces(paybuf);
+                                if (strcasecmp(paybuf, "batal") == 0) {
+                                    printf("Pembayaran dibatalkan oleh peminjam.\n");
+                                    break;
+                                }
+                                unsigned long paid = strtoul(paybuf, NULL, 10);
+                                if (paid == fine) {
+                                    lib_set_loan_payment(db, input, (long)paid);
+                                    printf("Pembayaran Rp%lu dicatat. Terima kasih.\n", paid);
+                                    break;
+                                } else {
+                                    printf("Jumlah tidak sesuai. Harus tepat Rp%lu. Coba lagi.\n", fine);
+                                }
+                            }
+                        }
+                        lib_db_save(db);
+                        animation_loading_bar(300);
+                    } else {
+                        printf("[!] Gagal mengembalikan buku (kode: %d)\n", (int)st);
+                    }
                 }
                 break;
             }

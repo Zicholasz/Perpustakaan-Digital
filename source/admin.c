@@ -81,8 +81,8 @@ void menu_admin(library_db_t *db) {
     printf("5. Cari buku (judul)\n");
     printf("6. Lihat history peminjaman\n");
         printf("7. Tandai pinjaman terlambat sebagai HILANG (by Loan ID)\n");
-        printf("9. Tandai buku hilang secara manual (by Loan ID)\n");
-        printf("10. Pengaturan (ubah denda / kebijakan penggantian)\n");
+        printf("8. Tandai buku hilang secara manual (by Loan ID)\n");
+        printf("9. Pengaturan (ubah denda / kebijakan penggantian)\n");
         printf("0. Kembali ke menu utama\n");
         printf("Pilihan anda: ");
 
@@ -306,9 +306,9 @@ void menu_admin(library_db_t *db) {
                 const book_t *results[64];
                 size_t found = lib_search_books_by_title(db, buf, results, 64);
                 if (found > 0) {
-                    printf("\nDitemukan %zu buku:\n", found);
+                    printf("\nDitemukan %lu buku:\n", (unsigned long)found);
                     for (size_t i = 0; i < found; i++) {
-                        printf("\n=== Buku #%zu ===\n", i+1);
+                        printf("\n=== Buku #%lu ===\n", (unsigned long)(i+1));
                         lib_print_book(results[i], stdout);
                     }
                 } else {
@@ -328,7 +328,6 @@ void menu_admin(library_db_t *db) {
 
                 for (size_t i = 0; i < db->loans_count; i++) {
                     const loan_t *l = &db->loans[i];
-                    const book_t *b = lib_find_book_by_isbn(db, l->isbn);
                     const borrower_t *br = lib_find_borrower_by_id(db, l->borrower_id);
 
                     char date_borrow[16], date_due[16], date_return[16];
@@ -356,27 +355,31 @@ void menu_admin(library_db_t *db) {
                     else printf("Dipinjam\n");
                 }
 
-                /* Tambahkan opsi untuk hapus history pinjaman lama */
-                printf("\nApakah Anda ingin menghapus history pinjaman lama? [Y/N]: ");
+                /* Tambahkan opsi untuk hapus history pinjaman tertentu */
+                printf("\nApakah Anda ingin menghapus history pinjaman tertentu? [Y/N]: ");
                 if (!read_line_local(buf, sizeof(buf))) break;
                 if (buf[0] == 'y' || buf[0] == 'Y') {
-                    printf("Masukkan jumlah hari minimum (history yang sudah dikembalikan dan lebih lama dari X hari akan dihapus): ");
+                    printf("Masukkan Loan ID yang ingin dihapus: ");
                     if (!read_line_local(buf, sizeof(buf))) break;
-                    unsigned long days = strtoul(buf, NULL, 10);
-                    if (days == 0) {
-                        printf("[!] Jumlah hari harus lebih dari 0.\n");
+                    trim_spaces(buf);
+                    size_t index = 0;
+                    for (index = 0; index < db->loans_count; index++) {
+                        if (strcmp(db->loans[index].loan_id, buf) == 0) {
+                            break;
+                        }
+                    }
+                    if (index == db->loans_count) {
+                        printf("[!] Loan ID tidak ditemukan.\n");
                         break;
                     }
-                    size_t before_count = db->loans_count;
-                    lib_status_t st = lib_remove_old_loans(db, days);
-                    size_t removed = before_count - db->loans_count;
-                    if (st == LIB_OK) {
-                        printf("Berhasil menghapus %zu history pinjaman lama.\n", removed);
-                        lib_db_save(db);
-                        animation_loading_bar(300);
-                    } else {
-                        printf("[!] Gagal menghapus history pinjaman lama (kode: %d)\n", (int)st);
+                    // Remove by shifting
+                    for (size_t i = index; i < db->loans_count - 1; i++) {
+                        db->loans[i] = db->loans[i+1];
                     }
+                    db->loans_count--;
+                    printf("History pinjaman %s berhasil dihapus.\n", buf);
+                    lib_db_save(db);
+                    animation_loading_bar(300);
                 }
                 break;
             }
@@ -425,7 +428,7 @@ void menu_admin(library_db_t *db) {
                 }
                 break;
             }
-            case 9: {
+            case 8: {
                 ui_clear_screen();
                 animation_typewriter("[Admin] Tandai buku hilang secara manual...", 25);
                 animation_delay(300);
@@ -449,7 +452,7 @@ void menu_admin(library_db_t *db) {
                 }
                 break;
             }
-            case 10: {
+            case 9: {
                 ui_clear_screen();
                 animation_typewriter("[Admin] Pengaturan & kebijakan...", 25);
                 animation_delay(300);
